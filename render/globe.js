@@ -3,7 +3,8 @@
  * Plugs into Renderer as a scene plugin.
  */
 
-import bus, { Events } from '../core/eventBus.js';
+import bus, { Events }       from '../core/eventBus.js';
+import { getTexture }         from './textureManager.js';
 
 const RADIUS  = 1.0;
 const SEG     = 96;
@@ -90,15 +91,17 @@ export class GlobePlugin {
   #buildGlobe(THREE) {
     const geo = new THREE.SphereGeometry(RADIUS, SEG, SEG);
     const mat = new THREE.MeshPhongMaterial({
-      map:         this.#loadTex('assets/earth_day.jpg'),
-      bumpMap:     this.#loadTex('assets/earth_bump.jpg'),
-      bumpScale:   0.008,
-      specularMap: this.#loadTex('assets/earth_spec.jpg'),
-      specular:    new THREE.Color(0x333333),
-      shininess:   18,
+      color:     new THREE.Color(0x2244aa),
+      specular:  new THREE.Color(0x333333),
+      shininess: 18,
     });
     this.#globe = new THREE.Mesh(geo, mat);
     this.#rotGroup.add(this.#globe);
+
+    // Async texture loading — CDN fallback via textureManager
+    getTexture('earth_day').then(t      => { mat.map         = t; mat.color.setHex(0xffffff); mat.needsUpdate = true; }).catch(() => {});
+    getTexture('earth_normal').then(t   => { mat.normalMap   = t; mat.needsUpdate = true; }).catch(() => {});
+    getTexture('earth_specular').then(t => { mat.specularMap = t; mat.needsUpdate = true; }).catch(() => {});
 
     // Lighting
     const ambient = new THREE.AmbientLight(0x303050, 0.6);
@@ -107,45 +110,16 @@ export class GlobePlugin {
     this.#scene.add(ambient, sun);
   }
 
-  #buildAtmosphere(THREE) {
-    const geo = new THREE.SphereGeometry(RADIUS * 1.015, 64, 64);
-    const mat = new THREE.ShaderMaterial({
-      vertexShader: `
-        varying vec3 vNormal;
-        void main() {
-          vNormal = normalize(normalMatrix * normal);
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-        }`,
-      fragmentShader: `
-        varying vec3 vNormal;
-        void main() {
-          float rim = pow(1.0 - abs(dot(vNormal, vec3(0,0,1))), 3.0);
-          gl_FragColor = vec4(0.3, 0.6, 1.0, rim * 0.4);
-        }`,
-      transparent: true,
-      side: window.THREE?.BackSide ?? 1,
-      blending: window.THREE?.AdditiveBlending ?? 2,
-      depthWrite: false,
-    });
-    this.#atmosphere = new THREE.Mesh(geo, mat);
-    this.#rotGroup.add(this.#atmosphere);
-  }
-
   #buildClouds(THREE) {
-    const tex = this.#loadTex('assets/earth_clouds.png');
-    if (!tex) return;
     const geo = new THREE.SphereGeometry(RADIUS * 1.006, 64, 64);
     const mat = new THREE.MeshPhongMaterial({
-      map: tex, transparent: true, opacity: 0.38, depthWrite: false,
+      transparent: true, opacity: 0.38, depthWrite: false,
     });
     this.#clouds = new THREE.Mesh(geo, mat);
     this.#rotGroup.add(this.#clouds);
+    getTexture('earth_clouds').then(t => { mat.map = t; mat.needsUpdate = true; }).catch(() => {});
   }
 
-  #loadTex(path) {
-    try { return new window.THREE.TextureLoader().load(path); }
-    catch { return null; }
-  }
 
   // ── Mouse / touch controls ───────────────────────────────────────────────
 

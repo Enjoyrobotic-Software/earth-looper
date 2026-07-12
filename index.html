@@ -108,6 +108,8 @@ import { TimelineUI }                   from './ui/timeline.js';
 import CausalChainPanel                 from './ui/causalChainPanel.js';
 import ExportPanel                      from './ui/exportPanel.js';
 import CountryCompare                   from './ui/countryCompare.js';
+import PerfMonitor                      from './ui/perfMonitor.js';
+import KeyboardShortcuts                from './ui/keyboardShortcuts.js';
 
 // ── Sources ────────────────────────────────────────────────────────────────
 import { USGSSource }                   from './sources/usgs.js';
@@ -171,6 +173,8 @@ const timeline     = new TimelineUI();
 const causalPanel   = new CausalChainPanel();
 const exportPanel   = new ExportPanel(canvas);
 const countryComp   = new CountryCompare();
+const perfMonitor   = new PerfMonitor();
+const shortcuts     = new KeyboardShortcuts();
 
 panel.init();
 layerBar.init();
@@ -181,6 +185,8 @@ timeline.init();
 causalPanel.init();
 exportPanel.init();
 countryComp.init();
+perfMonitor.init();
+shortcuts.init();
 
 engine.setRenderer(renderer);
 
