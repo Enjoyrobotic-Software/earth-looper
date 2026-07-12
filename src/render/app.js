@@ -2,6 +2,7 @@ import { eventBus } from '../core/eventBus.js';
 import { scheduler } from '../core/scheduler.js';
 import { LAYERS, toHex } from '../layers/layers.js';
 import { NewsSource } from '../sources/newsSource.js';
+import { UsgsSource } from '../sources/usgsSource.js';
 
 // === FEATURE STUBS (available immediately for onclick) ===
 window.toggleArcs = function () { window._f && window._f.toggleArcs(); };
@@ -215,6 +216,81 @@ export function initApp({ CD, LAND_GEOJSON, BORDERS_GEOJSON }) {
     mkMarkers();
   });
 
+  // ══════════════════════════════════════════════════
+  // EARTHQUAKES — first data source built on Source + Scheduler
+  // ══════════════════════════════════════════════════
+  const usgsSource = new UsgsSource();
+  const qkG = new THREE.Group(); qkG.visible = false; scene.add(qkG);
+  const quakeMarkers = [];
+  let _quakesOn = false, _quakesStarted = false;
+
+  function quakeColor(mag) {
+    // 4.5 (yellow) → 7+ (red)
+    const t = Math.max(0, Math.min(1, (mag - 4.5) / 2.5));
+    return new THREE.Color(1, 0.85 - t * 0.65, 0.15 - t * 0.15);
+  }
+
+  function rebuildQuakeMarkers(quakes) {
+    qkG.clear(); quakeMarkers.length = 0;
+    quakes.forEach(q => {
+      const col = quakeColor(q.mag);
+      const pos = ll3(q.lat, q.lon, 1.012);
+      const dir = pos.clone().normalize();
+      const size = 0.006 + Math.max(0, q.mag - 4) * 0.003;
+
+      const ring = new THREE.Mesh(
+        new THREE.RingGeometry(size, size * 1.7, 20),
+        new THREE.MeshBasicMaterial({ color: col, side: THREE.DoubleSide, transparent: true, opacity: .75 })
+      );
+      ring.position.copy(pos); ring.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir);
+
+      const dot = new THREE.Mesh(
+        new THREE.CircleGeometry(size * .55, 12),
+        new THREE.MeshBasicMaterial({ color: col, side: THREE.DoubleSide })
+      );
+      dot.position.copy(pos); dot.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir);
+
+      qkG.add(ring, dot);
+      quakeMarkers.push({ q, ring, dot, pos, ph: Math.random() * Math.PI * 2 });
+    });
+    const btn = document.getElementById('quake-btn');
+    if (btn) btn.textContent = `🌎 SISMOS${_quakesOn ? ' ON' : ''} (${quakes.length})`;
+  }
+
+  eventBus.on('earthquakes:updated', ({ quakes }) => rebuildQuakeMarkers(quakes));
+
+  function toggleEarthquakes() {
+    _quakesOn = !_quakesOn;
+    qkG.visible = _quakesOn;
+    const btn = document.getElementById('quake-btn');
+    if (btn) btn.textContent = `🌎 SISMOS${_quakesOn ? ' ON' : ''}${quakeMarkers.length ? ` (${quakeMarkers.length})` : ''}`;
+    if (_quakesOn && !_quakesStarted) {
+      _quakesStarted = true;
+      // 5 min cadence — the USGS feed itself is cached for 60s server-side,
+      // and this is the "past week" feed, so it changes slowly.
+      scheduler.register('earthquakes', 5 * 60 * 1000, async () => {
+        const raw = await usgsSource.fetch();
+        eventBus.emit('earthquakes:updated', { quakes: usgsSource.normalize(raw) });
+      });
+    }
+    if (!_quakesOn) hideQuakeTip();
+  }
+  window.toggleEarthquakes = toggleEarthquakes;
+
+  function showQuakeTip(e, q) {
+    const tip = document.getElementById('quake-tip');
+    if (!tip) return;
+    const ago = _timeAgo(q.time);
+    tip.innerHTML = `<b>M${q.mag.toFixed(1)}</b><br>${q.place}<br>${q.depthKm.toFixed(0)} km de profundidad · ${ago}<br><a href="${q.url}" target="_blank" rel="noopener">Ver en USGS →</a>`;
+    tip.style.left = Math.min(e.clientX + 14, innerWidth - 236) + 'px';
+    tip.style.top = Math.min(e.clientY + 14, innerHeight - 110) + 'px';
+    tip.style.display = 'block';
+  }
+  function hideQuakeTip() {
+    const tip = document.getElementById('quake-tip');
+    if (tip) tip.style.display = 'none';
+  }
+
   // ── CONTROLS ──
   let drag = false, prev = { x: 0, y: 0 }, tRY = .5, tRX = 0, rY = .5, rX = 0;
   const DAMP = .07;
@@ -290,8 +366,22 @@ export function initApp({ CD, LAND_GEOJSON, BORDERS_GEOJSON }) {
       const dist = Math.hypot(e.clientX - sx, e.clientY - sy);
       if (dist < 34 && dist < bestD) { bestD = dist; best = m; }
     });
-    if (best) openCard(e, best);
-    else closeAll();
+    if (best) { openCard(e, best); return; }
+
+    if (_quakesOn) {
+      let bestQ = null, bestQD = Infinity;
+      quakeMarkers.forEach(m => {
+        const wp = m.pos.clone(); globe.localToWorld(wp);
+        const sp = wp.clone().project(camera);
+        const sx = (sp.x * .5 + .5) * innerWidth, sy = (1 - (sp.y * .5 + .5)) * innerHeight;
+        const dist = Math.hypot(e.clientX - sx, e.clientY - sy);
+        if (dist < 18 && dist < bestQD) { bestQD = dist; bestQ = m; }
+      });
+      if (bestQ) { showQuakeTip(e, bestQ.q); return; }
+    }
+
+    hideQuakeTip();
+    closeAll();
   }
 
   // ══════════════════════════════════════════════════
@@ -678,12 +768,18 @@ export function initApp({ CD, LAND_GEOJSON, BORDERS_GEOJSON }) {
     cloudMesh.rotation.set(rX, rY + t * .00015, 0);
     if (cloudMesh.userData.extra) cloudMesh.userData.extra.rotation.set(rX, rY + t * .0002, 0);
     mkG.rotation.set(rX, rY, 0);
+    qkG.rotation.set(rX, rY, 0);
     atmOuter.uniforms.uCam.value.copy(camera.position);
     atmOuter.uniforms.uSun.value.set(5, 3, 4).normalize();
     markers.forEach(m => {
       const s = 1 + .28 * Math.sin(t * 2. + m.ph);
       m.ring.scale.setScalar(s);
       m.ring.material.opacity = .45 + .3 * Math.sin(t * 2 + m.ph);
+    });
+    quakeMarkers.forEach(m => {
+      const s = 1 + .35 * Math.sin(t * 1.6 + m.ph);
+      m.ring.scale.setScalar(s);
+      m.ring.material.opacity = .5 + .35 * Math.sin(t * 1.6 + m.ph);
     });
     renderer.render(scene, camera);
   }

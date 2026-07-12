@@ -24,6 +24,7 @@ src/
   sources/
     source.js           interfaz base: connect/fetch/normalize/disconnect
     newsSource.js         RSS de prensa (vía proxy rss2json) implementando esa interfaz
+    usgsSource.js          terremotos M4.5+ (feed público USGS) implementando esa interfaz
   render/
     app.js                el motor: escena Three.js, globo, marcadores, tarjetas de país,
                             panel de noticias, buscador, todas las features (arcos, heatmap,
@@ -49,9 +50,14 @@ más adelante.
 - **Scheduler**: las noticias de prensa se refrescan cada 10 minutos a
   través de una tarea registrada, no de un `fetch()` disparado una vez al
   abrir el panel.
-- **Source**: `NewsSource` implementa `fetch()`/`normalize()`; es la primera
-  fuente de datos con esa forma. Es la plantilla para añadir fuentes nuevas
-  (USGS, OpenSky, AIS, etc.) sin tocar el resto del código.
+- **Source**: `NewsSource` y `UsgsSource` implementan `fetch()`/`normalize()`.
+  `UsgsSource` es la primera capa geofísica real: lee el feed público de
+  terremotos (M4.5+, últimos 7 días, con CORS abierto — sin proxy ni clave),
+  se registra en el scheduler cada 5 min (bajo demanda, al activar el botón
+  🌎 SISMOS) y pinta marcadores en el globo coloreados/escalados por
+  magnitud. Tap sobre un marcador muestra lugar, profundidad, antigüedad y
+  enlace a la ficha USGS. Es la plantilla para añadir más fuentes (OpenSky,
+  AIS, EONET, NOAA...) sin tocar el resto del código.
 
 ## Qué NO es real todavía (y no conviene fingir que lo es)
 
@@ -67,10 +73,11 @@ silencio. Antes de trocearlo más hace falta:
    de variables de closure) para que dividir en `scene.js` / `markers.js` /
    `cards.js` / `newsPanel.js` no sea arriesgado.
 
-No hay motor espacial (QuadTree/R-Tree/LOD), no hay motor de simulación,
-no hay grafo causal de IA, no hay más fuentes de datos que la de prensa.
-Todo eso — lo que se discutió como "EarthOS" — es trabajo real pendiente,
-no algo que exista parcialmente a medias en el código.
+No hay motor espacial (QuadTree/R-Tree/LOD) — con ~100 terremotos y 63
+países no hace falta todavía, pero con miles de aviones/barcos sí haría
+falta. No hay motor de simulación, no hay grafo causal de IA. Todo eso —
+lo que se discutió como "EarthOS" — es trabajo real pendiente, no algo que
+exista parcialmente a medias en el código.
 
 ## Cómo servirlo en local
 
@@ -84,7 +91,16 @@ y abrir `http://localhost:8000/`.
 
 ## Próximo sprint razonable
 
-Extraer una segunda fuente de datos real (por ejemplo USGS terremotos)
-usando la interfaz `Source` + `scheduler`, y emitir sus eventos por
-`eventBus` para pintarlos como una capa nueva. Eso ejercita el patrón con
-un caso nuevo antes de decidir cómo trocear `app.js`.
+Con dos fuentes reales (`NewsSource`, `UsgsSource`) el patrón `Source` +
+`scheduler` + `eventBus` ya está ejercitado dos veces. Candidatos para el
+siguiente incremento, en orden de esfuerzo:
+
+1. Una tercera fuente con otro perfil de volumen/cadencia (p.ej. EONET de
+   la NASA para incendios/tormentas — decenas de eventos, feed público) para
+   confirmar que el patrón sigue aguantando antes de invertir en un
+   `RenderContext` compartido.
+2. Tests de humo permanentes en el repo (el script de Playwright usado para
+   verificar esta sesión, pero versionado) para poder trocear `app.js` con
+   confianza.
+3. Sólo entonces, sourcees de volumen alto (OpenSky, AIS) que sí necesiten
+   un motor espacial (LOD/tiles) antes de pintarse.
