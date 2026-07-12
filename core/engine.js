@@ -24,6 +24,7 @@ const LAYER_DEFS = [
   { id:'ocean',       name:'Ocean SST',    icon:'🌊', color:'#0077b6', sources:['copernicus'],enabled:false },
   { id:'conflicts',   name:'Conflicts',    icon:'⚔️', color:'#880e4f', sources:['acled'],     enabled:false },
   { id:'borders',    name:'Borders',      icon:'🗺️', color:'#445566', sources:[],            enabled:true  },
+  { id:'night',      name:'Night Side',   icon:'🌑', color:'#000510', sources:[],            enabled:true  },
 ];
 
 class EarthEngine {

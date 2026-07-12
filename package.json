@@ -1,0 +1,14 @@
+{
+  "name": "earth-looper",
+  "version": "5.0.0",
+  "type": "module",
+  "description": "EarthOS v5 — digital twin of planet Earth",
+  "scripts": {
+    "test": "node --experimental-vm-modules node_modules/vitest/vitest.mjs run",
+    "test:watch": "node --experimental-vm-modules node_modules/vitest/vitest.mjs",
+    "serve": "python3 -m http.server 8080"
+  },
+  "devDependencies": {
+    "vitest": "^1.6.1"
+  }
+}

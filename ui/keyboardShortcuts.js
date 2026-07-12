@@ -95,12 +95,12 @@ export class KeyboardShortcuts {
       }
       case 'ArrowLeft': {
         e.preventDefault();
-        timeEngine.seek(timeEngine.currentTime - 3_600_000);
+        timeEngine.seek(timeEngine.now - 3_600_000);
         break;
       }
       case 'ArrowRight': {
         e.preventDefault();
-        timeEngine.seek(timeEngine.currentTime + 3_600_000);
+        timeEngine.seek(timeEngine.now + 3_600_000);
         break;
       }
       case '0': {

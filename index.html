@@ -51,6 +51,7 @@ canvas { display:block; touch-action:none; }
 
 /* Status bar managed by ui/statusBar.js */
 </style>
+<link rel="manifest" href="manifest.json">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
 </head>
@@ -97,6 +98,7 @@ import ConflictLayer                    from './render/layers/conflictLayer.js';
 import EconomyLayer                     from './render/layers/economyLayer.js';
 import BorderLayer                      from './render/layers/borderLayer.js';
 import PollutionLayer                   from './render/layers/pollutionLayer.js';
+import NightLayer                       from './render/layers/nightLayer.js';
 
 // ── UI ─────────────────────────────────────────────────────────────────────
 import { PanelUI }                      from './ui/panel.js';
@@ -110,6 +112,7 @@ import ExportPanel                      from './ui/exportPanel.js';
 import CountryCompare                   from './ui/countryCompare.js';
 import PerfMonitor                      from './ui/perfMonitor.js';
 import KeyboardShortcuts                from './ui/keyboardShortcuts.js';
+import LiveIndicator                    from './ui/liveIndicator.js';
 
 // ── Sources ────────────────────────────────────────────────────────────────
 import { USGSSource }                   from './sources/usgs.js';
@@ -162,6 +165,7 @@ renderer.addPlugin('conf-layer', new ConflictLayer());
 renderer.addPlugin('gdp-layer',  new EconomyLayer());
 renderer.addPlugin('border-layer', new BorderLayer());
 renderer.addPlugin('pol-layer',  new PollutionLayer());
+renderer.addPlugin('night-layer', new NightLayer());
 
 // UI
 const panel    = new PanelUI();
@@ -175,6 +179,7 @@ const exportPanel   = new ExportPanel(canvas);
 const countryComp   = new CountryCompare();
 const perfMonitor   = new PerfMonitor();
 const shortcuts     = new KeyboardShortcuts();
+const liveIndicator = new LiveIndicator();
 
 panel.init();
 layerBar.init();
@@ -187,6 +192,7 @@ exportPanel.init();
 countryComp.init();
 perfMonitor.init();
 shortcuts.init();
+liveIndicator.init();
 
 engine.setRenderer(renderer);
 
@@ -246,6 +252,13 @@ console.log('[EarthOS] History:', historyBuffer.stats());
 
 // Expose scenario engine on window for devtools/console use
 window.EarthOS = { engine, timeEngine, causalGraph, eventAnalyzer, historyBuffer, scenarioEngine };
+
+// ── Service Worker (PWA) ───────────────────────────────────────────────────
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js', { scope: './' })
+    .then(r => console.log('[SW] registered', r.scope))
+    .catch(e => console.warn('[SW] registration failed', e));
+}
 
 </script>
 </body>
