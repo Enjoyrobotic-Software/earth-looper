@@ -28,7 +28,7 @@ export const SOURCE_CONFIG = {
   },
 
   openaq: {
-    enabled: false, // Enable to show air quality
+    enabled: true,  // Public API, no key required
     param:   'pm25',
     country: null,  // null = global
   },

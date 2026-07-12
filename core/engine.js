@@ -23,6 +23,7 @@ const LAYER_DEFS = [
   { id:'gdp',         name:'Economy',      icon:'💰', color:'#e8c97a', sources:['worldbank'], enabled:false },
   { id:'ocean',       name:'Ocean SST',    icon:'🌊', color:'#0077b6', sources:['copernicus'],enabled:false },
   { id:'conflicts',   name:'Conflicts',    icon:'⚔️', color:'#880e4f', sources:['acled'],     enabled:false },
+  { id:'borders',    name:'Borders',      icon:'🗺️', color:'#445566', sources:[],            enabled:true  },
 ];
 
 class EarthEngine {
