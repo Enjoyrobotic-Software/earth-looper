@@ -70,6 +70,29 @@ export class NotificationSystem {
     watch(Events.STORM,      'storm');
     watch(Events.FLOOD,      'flood');
     watch(Events.TSUNAMI,    'tsunami');
+
+    // AI / insight toasts
+    this.#unsub.push(bus.on(Events.NOTIFICATION, n => this.pushText(n.text ?? '', n.severity)));
+  }
+
+  /** Push a plain-text notification (from AI engine) */
+  pushText(text, severity = 'info') {
+    if (this.#toasts.length >= this.#MAX) this.#dismiss(this.#toasts[0]);
+    const color = { critical:'#e05555', warning:'#e8c97a', info:'#4a90d4' }[severity] ?? '#e8c97a';
+    const icon  = { critical:'⚠️', warning:'🔗', info:'💡' }[severity] ?? '💡';
+    const toast = document.createElement('div');
+    toast.className = 'eos-toast';
+    toast.style.setProperty('--t-color', color);
+    toast.innerHTML = `
+      <div class="eos-toast__icon">${icon}</div>
+      <div class="eos-toast__body">
+        <div class="eos-toast__title">${this.#escape(text)}</div>
+      </div>
+      <button class="eos-toast__close" aria-label="Dismiss">✕</button>`;
+    toast.querySelector('.eos-toast__close').onclick = () => this.#dismiss(toast);
+    this.#container.appendChild(toast);
+    this.#toasts.push(toast);
+    setTimeout(() => this.#dismiss(toast), 8000);
   }
 
   push(type, ev) {

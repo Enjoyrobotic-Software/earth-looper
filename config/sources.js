@@ -38,8 +38,22 @@ export const SOURCE_CONFIG = {
     apiKey:  null,  // Get key at https://aisstream.io
   },
 
+  noaa: {
+    enabled: true,  // Public APIs, no key required
+  },
+
+  copernicus: {
+    enabled: true,  // Uses Open-Meteo marine proxy, no key required
+  },
+
+  acled: {
+    enabled: true,
+    apiKey:  null,  // Optional: register at https://acleddata.com/register/
+    email:   null,  // Required with apiKey
+  },
+
   worldbank: {
-    enabled: false,
+    enabled: true,  // Public API, no key required
   },
 };
 

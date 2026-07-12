@@ -58,6 +58,10 @@ export const Events = Object.freeze({
   // Simulation
   SIM_STEP:            'sim:step',
   SIM_RESET:           'sim:reset',
+  WIND_FIELD_READY:    'sim:wind_ready',
+
+  // Notifications
+  NOTIFICATION:        'ui:notification',
 });
 
 class EventBus {

@@ -76,8 +76,13 @@ canvas { display:block; touch-action:none; }
 
 <!-- EarthOS Bootstrap -->
 <script type="module">
+// ── Core ───────────────────────────────────────────────────────────────────
 import engine                           from './core/engine.js';
 import { workerPool }                   from './core/workerPool.js';
+import timeEngine                       from './core/timeEngine.js';
+import bus, { Events }                  from './core/eventBus.js';
+
+// ── Renderer ───────────────────────────────────────────────────────────────
 import { Renderer }                     from './render/renderer.js';
 import GlobePlugin                      from './render/globe.js';
 import { EarthquakeLayerRenderer }      from './render/layers/earthquakeLayer.js';
@@ -86,20 +91,40 @@ import { FlightLayerRenderer }          from './render/layers/flightLayer.js';
 import { ShipLayerRenderer }            from './render/layers/shipLayer.js';
 import { SatelliteLayerRenderer }       from './render/layers/satelliteLayer.js';
 import { VolcanoLayerRenderer }         from './render/layers/volcanoLayer.js';
+import WindLayer                        from './render/layers/windLayer.js';
+import OceanLayer                       from './render/layers/oceanLayer.js';
+import ConflictLayer                    from './render/layers/conflictLayer.js';
+import EconomyLayer                     from './render/layers/economyLayer.js';
+
+// ── UI ─────────────────────────────────────────────────────────────────────
 import { PanelUI }                      from './ui/panel.js';
 import { LayerBarUI }                   from './ui/layerBar.js';
 import { SearchUI }                     from './ui/search.js';
 import { NotificationSystem }           from './ui/notifications.js';
 import { StatusBar }                    from './ui/statusBar.js';
+import { TimelineUI }                   from './ui/timeline.js';
+
+// ── Sources ────────────────────────────────────────────────────────────────
 import { USGSSource }                   from './sources/usgs.js';
 import { EONETSource }                  from './sources/eonet.js';
 import { FIRMSSource }                  from './sources/firms.js';
 import { OpenSkySource }                from './sources/opensky.js';
 import { AISStreamSource }              from './sources/aisstream.js';
 import { TLESource }                    from './sources/tle.js';
+import { NOAASource }                   from './sources/noaa.js';
+import { CopernicusSource }             from './sources/copernicus.js';
+import { ACLEDSource }                  from './sources/acled.js';
+import { WorldBankSource }              from './sources/worldbank.js';
+
+// ── AI / Simulation ────────────────────────────────────────────────────────
+import causalGraph                      from './ai/causalGraph.js';
+import eventAnalyzer                    from './ai/eventAnalyzer.js';
+import insights                         from './ai/insights.js';
+import windSim                          from './simulation/windSim.js';
+
+// ── Config ─────────────────────────────────────────────────────────────────
 import { COUNTRIES }                    from './config/countries.js';
 import SOURCE_CONFIG                    from './config/sources.js';
-import bus, { Events }                  from './core/eventBus.js';
 
 // ── Boot sequence ──────────────────────────────────────────────────────────
 console.time('[EarthOS] boot');
@@ -113,16 +138,18 @@ const canvas   = document.getElementById('c');
 const renderer = new Renderer(canvas);
 await renderer.init();
 
-// Globe
-renderer.addPlugin('globe', new GlobePlugin());
-
-// Layer renderers (all GPU-instanced)
+// Globe + layer renderers
+renderer.addPlugin('globe',      new GlobePlugin());
 renderer.addPlugin('eq-layer',   new EarthquakeLayerRenderer());
 renderer.addPlugin('fire-layer', new FireLayerRenderer());
 renderer.addPlugin('vol-layer',  new VolcanoLayerRenderer());
 renderer.addPlugin('flt-layer',  new FlightLayerRenderer());
 renderer.addPlugin('shp-layer',  new ShipLayerRenderer());
 renderer.addPlugin('sat-layer',  new SatelliteLayerRenderer());
+renderer.addPlugin('wind-layer', new WindLayer());
+renderer.addPlugin('ocean-layer',new OceanLayer());
+renderer.addPlugin('conf-layer', new ConflictLayer());
+renderer.addPlugin('gdp-layer',  new EconomyLayer());
 
 // UI
 const panel    = new PanelUI();
@@ -130,31 +157,44 @@ const layerBar = new LayerBarUI('eos-layer-bar');
 const search   = new SearchUI(COUNTRIES);
 const notifs   = new NotificationSystem();
 const status   = new StatusBar();
+const timeline = new TimelineUI();
 
 panel.init();
 layerBar.init();
 search.init();
 notifs.init();
 status.init();
+timeline.init();
 
 engine.setRenderer(renderer);
 
-// Data sources
+// ── Data sources ──────────────────────────────────────────────────────────
 if (SOURCE_CONFIG.usgs.enabled)
-  engine.registerSource('usgs',      new USGSSource(SOURCE_CONFIG.usgs));
+  engine.registerSource('usgs',        new USGSSource(SOURCE_CONFIG.usgs));
 if (SOURCE_CONFIG.eonet.enabled)
-  engine.registerSource('eonet',     new EONETSource(SOURCE_CONFIG.eonet));
+  engine.registerSource('eonet',       new EONETSource(SOURCE_CONFIG.eonet));
 if (SOURCE_CONFIG.firms.enabled)
-  engine.registerSource('firms',     new FIRMSSource(SOURCE_CONFIG.firms));
+  engine.registerSource('firms',       new FIRMSSource(SOURCE_CONFIG.firms));
 if (SOURCE_CONFIG.opensky.enabled)
-  engine.registerSource('opensky',   new OpenSkySource(SOURCE_CONFIG.opensky));
+  engine.registerSource('opensky',     new OpenSkySource(SOURCE_CONFIG.opensky));
 if (SOURCE_CONFIG.aisstream.enabled)
-  engine.registerSource('aisstream', new AISStreamSource(SOURCE_CONFIG.aisstream));
+  engine.registerSource('aisstream',   new AISStreamSource(SOURCE_CONFIG.aisstream));
+if (SOURCE_CONFIG.noaa.enabled)
+  engine.registerSource('noaa',        new NOAASource(SOURCE_CONFIG.noaa));
+if (SOURCE_CONFIG.copernicus.enabled)
+  engine.registerSource('copernicus',  new CopernicusSource(SOURCE_CONFIG.copernicus));
+if (SOURCE_CONFIG.acled.enabled)
+  engine.registerSource('acled',       new ACLEDSource(SOURCE_CONFIG.acled));
+if (SOURCE_CONFIG.worldbank.enabled)
+  engine.registerSource('worldbank',   new WorldBankSource(SOURCE_CONFIG.worldbank));
 
 // TLE satellites — always on (CelesTrak is public)
 engine.registerSource('tle', new TLESource({ catalogs: ['stations', 'starlink', 'gps_ops'] }));
 
-// Wire globe click → nearest country
+// ── AI engines initialised by import side-effects ─────────────────────────
+// causalGraph, eventAnalyzer, insights — active listeners from module load
+
+// ── Globe click → country panel ──────────────────────────────────────────
 bus.on(Events.COUNTRY_SELECTED, ({ lat, lon, country }) => {
   if (country) { panel.showCountry(country); return; }
   let nearest = null, best = Infinity;
@@ -165,17 +205,19 @@ bus.on(Events.COUNTRY_SELECTED, ({ lat, lon, country }) => {
   if (nearest && best < 15) panel.showCountry(nearest);
 });
 
-// Clock in top bar
+// ── UTC clock ─────────────────────────────────────────────────────────────
 const clk  = document.getElementById('clk');
 const tick = () => { clk.textContent = new Date().toUTCString().slice(17,25) + ' UTC'; };
 tick(); setInterval(tick, 1000);
 
-// Start everything
+// ── Start ─────────────────────────────────────────────────────────────────
 renderer.start();
 await engine.start();
+timeEngine.goLive();
 
 console.timeEnd('[EarthOS] boot');
 console.log('[EarthOS] Status:', engine.status());
+console.log('[EarthOS] Graph:', causalGraph.size());
 </script>
 </body>
 </html>
