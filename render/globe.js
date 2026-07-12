@@ -160,7 +160,7 @@ export class GlobePlugin {
     this.#handlers.touchstart = e => this.#onDown(e.touches[0].clientX, e.touches[0].clientY);
     this.#handlers.touchmove  = e => { e.preventDefault(); this.#onMove(e.touches[0].clientX, e.touches[0].clientY); };
     this.#handlers.touchend   = ()  => this.#onUp();
-    this.#handlers.click      = e => this.#onClick(e.clientX, e.clientY);
+    this.#handlers.click      = e => this.#onClick(e.clientX, e.clientY, e.shiftKey);
 
     for (const [ev, fn] of Object.entries(this.#handlers)) {
       el.addEventListener(ev, fn, { passive: ev.startsWith('touch') && ev !== 'touchmove' });
@@ -194,9 +194,9 @@ export class GlobePlugin {
     this.#camera.position.z = Math.max(1.15, Math.min(8, z));
   }
 
-  #onClick(x, y) {
+  #onClick(x, y, shiftKey = false) {
     const pos = this.projectToGlobe(x, y);
-    if (pos) bus.emit(Events.COUNTRY_SELECTED, pos);
+    if (pos) bus.emit(Events.COUNTRY_SELECTED, { ...pos, shiftKey });
   }
 }
 

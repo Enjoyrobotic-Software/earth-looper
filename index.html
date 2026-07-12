@@ -106,6 +106,8 @@ import { NotificationSystem }           from './ui/notifications.js';
 import { StatusBar }                    from './ui/statusBar.js';
 import { TimelineUI }                   from './ui/timeline.js';
 import CausalChainPanel                 from './ui/causalChainPanel.js';
+import ExportPanel                      from './ui/exportPanel.js';
+import CountryCompare                   from './ui/countryCompare.js';
 
 // ── Sources ────────────────────────────────────────────────────────────────
 import { USGSSource }                   from './sources/usgs.js';
@@ -126,6 +128,7 @@ import eventAnalyzer                    from './ai/eventAnalyzer.js';
 import insights                         from './ai/insights.js';
 import windSim                          from './simulation/windSim.js';
 import historyBuffer                    from './core/historyBuffer.js';
+import scenarioEngine                   from './simulation/scenarioEngine.js';
 
 // ── Config ─────────────────────────────────────────────────────────────────
 import { COUNTRIES }                    from './config/countries.js';
@@ -165,7 +168,9 @@ const search   = new SearchUI(COUNTRIES);
 const notifs   = new NotificationSystem();
 const status   = new StatusBar();
 const timeline     = new TimelineUI();
-const causalPanel  = new CausalChainPanel();
+const causalPanel   = new CausalChainPanel();
+const exportPanel   = new ExportPanel(canvas);
+const countryComp   = new CountryCompare();
 
 panel.init();
 layerBar.init();
@@ -174,6 +179,8 @@ notifs.init();
 status.init();
 timeline.init();
 causalPanel.init();
+exportPanel.init();
+countryComp.init();
 
 engine.setRenderer(renderer);
 
@@ -230,6 +237,9 @@ console.timeEnd('[EarthOS] boot');
 console.log('[EarthOS] Status:', engine.status());
 console.log('[EarthOS] Graph:', causalGraph.size());
 console.log('[EarthOS] History:', historyBuffer.stats());
+
+// Expose scenario engine on window for devtools/console use
+window.EarthOS = { engine, timeEngine, causalGraph, eventAnalyzer, historyBuffer, scenarioEngine };
 
 </script>
 </body>

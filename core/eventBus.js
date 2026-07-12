@@ -62,6 +62,10 @@ export const Events = Object.freeze({
 
   // Notifications
   NOTIFICATION:        'ui:notification',
+
+  // Scenarios
+  SCENARIO_RESULT:     'sim:scenario_result',
+  SCENARIO_CLEAR:      'sim:scenario_clear',
 });
 
 class EventBus {
