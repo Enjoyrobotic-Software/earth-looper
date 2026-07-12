@@ -49,14 +49,7 @@ canvas { display:block; touch-action:none; }
 #clk  { font-family:var(--mono); font-size:11px; color:var(--muted); letter-spacing:.1em; }
 @media(max-width:480px){ #clkw { display:none; } }
 
-/* Status bar */
-#status { position:fixed; bottom:12px; left:50%; transform:translateX(-50%);
-          z-index:20; display:flex; gap:6px; pointer-events:none; }
-.status-pill { font-family:var(--mono); font-size:9px; letter-spacing:.08em; padding:4px 10px;
-               border-radius:20px; border:1px solid var(--rim); background:rgba(10,14,20,.8);
-               color:var(--muted); backdrop-filter:blur(8px); }
-.status-pill.ok  { border-color:rgba(76,175,125,.4); color:#4caf7d; }
-.status-pill.err { border-color:rgba(224,85,85,.4); color:#e05555; }
+/* Status bar managed by ui/statusBar.js */
 </style>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
@@ -78,36 +71,42 @@ canvas { display:block; touch-action:none; }
   <div id="sr"></div>
 </div>
 
-<!-- Status -->
-<div id="status">
-  <div class="status-pill" id="s-eq">Earthquakes —</div>
-  <div class="status-pill" id="s-fire">Fires —</div>
-  <div class="status-pill" id="s-flights">Flights —</div>
-</div>
-
 <!-- Three.js -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
 <!-- EarthOS Bootstrap -->
 <script type="module">
-import engine                        from './core/engine.js';
-import { Renderer }                  from './render/renderer.js';
-import GlobePlugin, { latLonToXYZ } from './render/globe.js';
-import { EarthquakeLayerRenderer }   from './render/layers/earthquakeLayer.js';
-import { FlightLayerRenderer }       from './render/layers/flightLayer.js';
-import { PanelUI }                   from './ui/panel.js';
-import { LayerBarUI }                from './ui/layerBar.js';
-import { SearchUI }                  from './ui/search.js';
-import { USGSSource }                from './sources/usgs.js';
-import { EONETSource }               from './sources/eonet.js';
-import { FIRMSSource }               from './sources/firms.js';
-import { OpenSkySource }             from './sources/opensky.js';
-import { COUNTRIES }                 from './config/countries.js';
-import SOURCE_CONFIG                 from './config/sources.js';
-import bus, { Events }               from './core/eventBus.js';
+import engine                           from './core/engine.js';
+import { workerPool }                   from './core/workerPool.js';
+import { Renderer }                     from './render/renderer.js';
+import GlobePlugin                      from './render/globe.js';
+import { EarthquakeLayerRenderer }      from './render/layers/earthquakeLayer.js';
+import { FireLayerRenderer }            from './render/layers/fireLayer.js';
+import { FlightLayerRenderer }          from './render/layers/flightLayer.js';
+import { ShipLayerRenderer }            from './render/layers/shipLayer.js';
+import { SatelliteLayerRenderer }       from './render/layers/satelliteLayer.js';
+import { VolcanoLayerRenderer }         from './render/layers/volcanoLayer.js';
+import { PanelUI }                      from './ui/panel.js';
+import { LayerBarUI }                   from './ui/layerBar.js';
+import { SearchUI }                     from './ui/search.js';
+import { NotificationSystem }           from './ui/notifications.js';
+import { StatusBar }                    from './ui/statusBar.js';
+import { USGSSource }                   from './sources/usgs.js';
+import { EONETSource }                  from './sources/eonet.js';
+import { FIRMSSource }                  from './sources/firms.js';
+import { OpenSkySource }                from './sources/opensky.js';
+import { AISStreamSource }              from './sources/aisstream.js';
+import { TLESource }                    from './sources/tle.js';
+import { COUNTRIES }                    from './config/countries.js';
+import SOURCE_CONFIG                    from './config/sources.js';
+import bus, { Events }                  from './core/eventBus.js';
 
 // ── Boot sequence ──────────────────────────────────────────────────────────
+console.time('[EarthOS] boot');
 await engine.init({ debug: false });
+
+// Worker pool (off-main-thread processing)
+workerPool.init();
 
 // Renderer
 const canvas   = document.getElementById('c');
@@ -115,34 +114,49 @@ const renderer = new Renderer(canvas);
 await renderer.init();
 
 // Globe
-const globe = new GlobePlugin();
-renderer.addPlugin('globe', globe);
+renderer.addPlugin('globe', new GlobePlugin());
 
-// Layer renderers
+// Layer renderers (all GPU-instanced)
 renderer.addPlugin('eq-layer',   new EarthquakeLayerRenderer());
-renderer.addPlugin('fire-layer', new FlightLayerRenderer());   // reuse pattern
+renderer.addPlugin('fire-layer', new FireLayerRenderer());
+renderer.addPlugin('vol-layer',  new VolcanoLayerRenderer());
+renderer.addPlugin('flt-layer',  new FlightLayerRenderer());
+renderer.addPlugin('shp-layer',  new ShipLayerRenderer());
+renderer.addPlugin('sat-layer',  new SatelliteLayerRenderer());
 
 // UI
 const panel    = new PanelUI();
 const layerBar = new LayerBarUI('eos-layer-bar');
 const search   = new SearchUI(COUNTRIES);
+const notifs   = new NotificationSystem();
+const status   = new StatusBar();
 
 panel.init();
 layerBar.init();
 search.init();
+notifs.init();
+status.init();
 
 engine.setRenderer(renderer);
 
 // Data sources
-if (SOURCE_CONFIG.usgs.enabled)    engine.registerSource('usgs',    new USGSSource(SOURCE_CONFIG.usgs));
-if (SOURCE_CONFIG.eonet.enabled)   engine.registerSource('eonet',   new EONETSource(SOURCE_CONFIG.eonet));
-if (SOURCE_CONFIG.firms.enabled)   engine.registerSource('firms',   new FIRMSSource(SOURCE_CONFIG.firms));
-if (SOURCE_CONFIG.opensky.enabled) engine.registerSource('opensky', new OpenSkySource(SOURCE_CONFIG.opensky));
+if (SOURCE_CONFIG.usgs.enabled)
+  engine.registerSource('usgs',      new USGSSource(SOURCE_CONFIG.usgs));
+if (SOURCE_CONFIG.eonet.enabled)
+  engine.registerSource('eonet',     new EONETSource(SOURCE_CONFIG.eonet));
+if (SOURCE_CONFIG.firms.enabled)
+  engine.registerSource('firms',     new FIRMSSource(SOURCE_CONFIG.firms));
+if (SOURCE_CONFIG.opensky.enabled)
+  engine.registerSource('opensky',   new OpenSkySource(SOURCE_CONFIG.opensky));
+if (SOURCE_CONFIG.aisstream.enabled)
+  engine.registerSource('aisstream', new AISStreamSource(SOURCE_CONFIG.aisstream));
 
-// Wire country click → panel
+// TLE satellites — always on (CelesTrak is public)
+engine.registerSource('tle', new TLESource({ catalogs: ['stations', 'starlink', 'gps_ops'] }));
+
+// Wire globe click → nearest country
 bus.on(Events.COUNTRY_SELECTED, ({ lat, lon, country }) => {
   if (country) { panel.showCountry(country); return; }
-  // Find nearest country by lat/lon
   let nearest = null, best = Infinity;
   for (const [iso, c] of Object.entries(COUNTRIES)) {
     const d = Math.hypot(c.lat - lat, c.lon - lon);
@@ -151,25 +165,8 @@ bus.on(Events.COUNTRY_SELECTED, ({ lat, lon, country }) => {
   if (nearest && best < 15) panel.showCountry(nearest);
 });
 
-// Status pills
-const pills = {
-  eq:      document.getElementById('s-eq'),
-  fire:    document.getElementById('s-fire'),
-  flights: document.getElementById('s-flights'),
-};
-bus.on(Events.LAYER_DATA_READY, ({ id, count }) => {
-  const map = { earthquakes: 'eq', fires: 'fire', flights: 'flights' };
-  const pill = pills[map[id]];
-  if (pill) { pill.textContent = `${id.toUpperCase()} ${count}`; pill.className = 'status-pill ok'; }
-});
-bus.on(Events.SOURCE_ERROR, ({ id }) => {
-  const map = { usgs:'eq', firms:'fire', opensky:'flights' };
-  const pill = pills[map[id]];
-  if (pill) pill.className = 'status-pill err';
-});
-
-// Clock
-const clk = document.getElementById('clk');
+// Clock in top bar
+const clk  = document.getElementById('clk');
 const tick = () => { clk.textContent = new Date().toUTCString().slice(17,25) + ' UTC'; };
 tick(); setInterval(tick, 1000);
 
@@ -177,7 +174,8 @@ tick(); setInterval(tick, 1000);
 renderer.start();
 await engine.start();
 
-console.log('[EarthOS] Ready. Status:', engine.status());
+console.timeEnd('[EarthOS] boot');
+console.log('[EarthOS] Status:', engine.status());
 </script>
 </body>
 </html>
