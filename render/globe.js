@@ -187,5 +187,5 @@ export class GlobePlugin {
   }
 }
 
-export { RADIUS, latLonToXYZ };
+export { RADIUS };
 export default GlobePlugin;
