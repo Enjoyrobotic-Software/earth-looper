@@ -78,9 +78,6 @@ class EarthEngine {
   async start() {
     if (!this.#ready) throw new Error('[EarthOS] Call init() first');
 
-    // Boot renderer
-    await this.#renderer?.init?.();
-
     // Boot UI
     await this.#ui?.init?.();
 
