@@ -110,6 +110,19 @@ export class GlobePlugin {
     this.#scene.add(ambient, sun);
   }
 
+  #buildAtmosphere(THREE) {
+    const geo = new THREE.SphereGeometry(RADIUS * 1.025, 64, 64);
+    const mat = new THREE.MeshPhongMaterial({
+      color:       new THREE.Color(0x4488ff),
+      transparent: true,
+      opacity:     0.13,
+      depthWrite:  false,
+      side:        THREE.BackSide,
+    });
+    this.#atmosphere = new THREE.Mesh(geo, mat);
+    this.#scene.add(this.#atmosphere);   // world space — no rota con el globo
+  }
+
   #buildClouds(THREE) {
     const geo = new THREE.SphereGeometry(RADIUS * 1.006, 64, 64);
     const mat = new THREE.MeshPhongMaterial({
