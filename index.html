@@ -157,9 +157,13 @@ import DataExplorerApp                  from './apps/dataExplorer.js';
 import SystemMonitorApp                 from './apps/systemMonitor.js';
 import ScenarioRunnerApp                from './apps/scenarioRunner.js';
 import SettingsApp                      from './apps/settings.js';
+import AssistantApp                     from './apps/assistant.js';
+import AlertManagerApp                  from './apps/alertManager.js';
 
 // ── Persistence ────────────────────────────────────────────────────────────
 import persistence                      from './core/persistence.js';
+import NotificationCenter               from './ui/notificationCenter.js';
+import alertEngine                      from './core/alertEngine.js';
 
 // ── Sources ────────────────────────────────────────────────────────────────
 import { USGSSource }                   from './sources/usgs.js';
@@ -178,6 +182,7 @@ import { WorldBankSource }              from './sources/worldbank.js';
 import causalGraph                      from './ai/causalGraph.js';
 import eventAnalyzer                    from './ai/eventAnalyzer.js';
 import insights                         from './ai/insights.js';
+import assistant                        from './ai/assistant.js';
 import windSim                          from './simulation/windSim.js';
 import historyBuffer                    from './core/historyBuffer.js';
 import scenarioEngine                   from './simulation/scenarioEngine.js';
@@ -246,20 +251,29 @@ windowManager.init();
 contextMenu.init();
 
 // ── Apps ──────────────────────────────────────────────────────────────────
-const termApp     = new TerminalApp();
-const explorerApp = new DataExplorerApp();
-const monitorApp  = new SystemMonitorApp();
-const scenarioApp = new ScenarioRunnerApp();
-const settingsApp = new SettingsApp();
+const termApp      = new TerminalApp();
+const explorerApp  = new DataExplorerApp();
+const monitorApp   = new SystemMonitorApp();
+const scenarioApp  = new ScenarioRunnerApp();
+const settingsApp  = new SettingsApp();
+const assistantApp = new AssistantApp();
+const alertMgrApp  = new AlertManagerApp();
+
+// ── Notification Center + Alert Engine ────────────────────────────────────
+const notifCenter = new NotificationCenter();
+notifCenter.init();
+alertEngine.init();
 
 // ── Dock ──────────────────────────────────────────────────────────────────
 const dock = new Dock();
 dock.init([
+  assistantApp,
   termApp,
   explorerApp,
   monitorApp,
   '---',
   scenarioApp,
+  alertMgrApp,
   settingsApp,
 ]);
 
@@ -313,12 +327,14 @@ tick(); setInterval(tick, 1000);
 canvas.addEventListener('contextmenu', e => {
   e.preventDefault();
   contextMenu.show(e.clientX, e.clientY, [
-    { icon:'🔍', label:'Open Data Explorer', action: () => explorerApp.launch() },
-    { icon:'🔮', label:'Run Scenario',        action: () => scenarioApp.launch() },
-    { icon:'📊', label:'System Monitor',      action: () => monitorApp.launch()  },
+    { icon:'🌍', label:'Earth Assistant',     action: () => assistantApp.launch() },
+    { icon:'🔍', label:'Data Explorer',       action: () => explorerApp.launch()  },
+    { icon:'🔮', label:'Run Scenario',        action: () => scenarioApp.launch()  },
+    { icon:'📊', label:'System Monitor',      action: () => monitorApp.launch()   },
     '---',
-    { icon:'💻', label:'Terminal',            action: () => termApp.launch()     },
-    { icon:'⚙️', label:'Settings',            action: () => settingsApp.launch() },
+    { icon:'💻', label:'Terminal',            action: () => termApp.launch()      },
+    { icon:'🚨', label:'Alert Manager',       action: () => alertMgrApp.launch()  },
+    { icon:'⚙️', label:'Settings',            action: () => settingsApp.launch()  },
   ]);
 });
 
@@ -347,7 +363,7 @@ console.log('[EarthOS] Graph:', causalGraph.size());
 console.log('[EarthOS] History:', historyBuffer.stats());
 
 // Expose scenario engine on window for devtools/console use
-window.EarthOS = { engine, timeEngine, causalGraph, eventAnalyzer, historyBuffer, scenarioEngine };
+window.EarthOS = { engine, timeEngine, causalGraph, eventAnalyzer, historyBuffer, scenarioEngine, alertEngine, assistant };
 
 // ── Service Worker (PWA) ───────────────────────────────────────────────────
 if ('serviceWorker' in navigator) {
