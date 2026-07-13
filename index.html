@@ -50,12 +50,46 @@ canvas { display:block; touch-action:none; }
 @media(max-width:480px){ #clkw { display:none; } }
 
 /* Status bar managed by ui/statusBar.js */
+
+/* Boot screen */
+#eos-boot {
+  position:fixed; inset:0; z-index:9999; background:#0b0f14;
+  display:flex; align-items:center; justify-content:center;
+  flex-direction:column; gap:20px; transition:opacity .5s ease;
+}
+#eos-boot.fade { opacity:0; pointer-events:none; }
+.eos-boot-logo {
+  font-family:'JetBrains Mono',monospace; font-size:28px; font-weight:500;
+  letter-spacing:.28em; text-transform:uppercase; color:rgba(255,255,255,0.9);
+}
+.eos-boot-logo span { color:#e8c97a; }
+.eos-boot-sub {
+  font-family:'JetBrains Mono',monospace; font-size:10px;
+  color:rgba(255,255,255,0.28); letter-spacing:.18em; text-transform:uppercase;
+}
+.eos-boot-bar {
+  width:160px; height:2px; background:rgba(255,255,255,0.08); border-radius:2px; overflow:hidden;
+}
+.eos-boot-fill {
+  height:100%; background:#e8c97a; border-radius:2px;
+  animation:eos-boot-progress 1.6s cubic-bezier(.4,0,.2,1) forwards;
+}
+@keyframes eos-boot-progress {
+  from { width:0; } to { width:100%; }
+}
 </style>
 <link rel="manifest" href="manifest.json">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
 </head>
 <body>
+<!-- Boot screen -->
+<div id="eos-boot">
+  <div class="eos-boot-logo">EARTH<span>OS</span></div>
+  <div class="eos-boot-sub">Digital Twin v5 · Sprint 9</div>
+  <div class="eos-boot-bar"><div class="eos-boot-fill"></div></div>
+</div>
+
 <div id="vig"></div>
 <div id="wrap"><canvas id="c"></canvas></div>
 
@@ -113,6 +147,19 @@ import CountryCompare                   from './ui/countryCompare.js';
 import PerfMonitor                      from './ui/perfMonitor.js';
 import KeyboardShortcuts                from './ui/keyboardShortcuts.js';
 import LiveIndicator                    from './ui/liveIndicator.js';
+import windowManager                    from './ui/windowManager.js';
+import Dock                             from './ui/dock.js';
+import contextMenu                      from './ui/contextMenu.js';
+
+// ── Apps ───────────────────────────────────────────────────────────────────
+import TerminalApp                      from './apps/terminal.js';
+import DataExplorerApp                  from './apps/dataExplorer.js';
+import SystemMonitorApp                 from './apps/systemMonitor.js';
+import ScenarioRunnerApp                from './apps/scenarioRunner.js';
+import SettingsApp                      from './apps/settings.js';
+
+// ── Persistence ────────────────────────────────────────────────────────────
+import persistence                      from './core/persistence.js';
 
 // ── Sources ────────────────────────────────────────────────────────────────
 import { USGSSource }                   from './sources/usgs.js';
@@ -194,6 +241,28 @@ perfMonitor.init();
 shortcuts.init();
 liveIndicator.init();
 
+// ── Window Manager + Context Menu ─────────────────────────────────────────
+windowManager.init();
+contextMenu.init();
+
+// ── Apps ──────────────────────────────────────────────────────────────────
+const termApp     = new TerminalApp();
+const explorerApp = new DataExplorerApp();
+const monitorApp  = new SystemMonitorApp();
+const scenarioApp = new ScenarioRunnerApp();
+const settingsApp = new SettingsApp();
+
+// ── Dock ──────────────────────────────────────────────────────────────────
+const dock = new Dock();
+dock.init([
+  termApp,
+  explorerApp,
+  monitorApp,
+  '---',
+  scenarioApp,
+  settingsApp,
+]);
+
 engine.setRenderer(renderer);
 
 // ── Data sources ──────────────────────────────────────────────────────────
@@ -240,10 +309,37 @@ const clk  = document.getElementById('clk');
 const tick = () => { clk.textContent = new Date().toUTCString().slice(17,25) + ' UTC'; };
 tick(); setInterval(tick, 1000);
 
+// ── Context menu on globe (right-click) ───────────────────────────────────
+canvas.addEventListener('contextmenu', e => {
+  e.preventDefault();
+  contextMenu.show(e.clientX, e.clientY, [
+    { icon:'🔍', label:'Open Data Explorer', action: () => explorerApp.launch() },
+    { icon:'🔮', label:'Run Scenario',        action: () => scenarioApp.launch() },
+    { icon:'📊', label:'System Monitor',      action: () => monitorApp.launch()  },
+    '---',
+    { icon:'💻', label:'Terminal',            action: () => termApp.launch()     },
+    { icon:'⚙️', label:'Settings',            action: () => settingsApp.launch() },
+  ]);
+});
+
+// ── Restore persisted layer states ────────────────────────────────────────
+for (const layer of engine.status().layers) {
+  const saved = persistence.load(`layer_${layer.id}`);
+  if (saved !== null && saved !== layer.enabled)
+    bus.emit(Events.LAYER_TOGGLE, { id: layer.id, enabled: saved });
+}
+
 // ── Start ─────────────────────────────────────────────────────────────────
 renderer.start();
 await engine.start();
 timeEngine.goLive();
+
+// ── Dismiss boot screen ───────────────────────────────────────────────────
+const bootEl = document.getElementById('eos-boot');
+if (bootEl) {
+  bootEl.classList.add('fade');
+  setTimeout(() => bootEl.remove(), 600);
+}
 
 console.timeEnd('[EarthOS] boot');
 console.log('[EarthOS] Status:', engine.status());
