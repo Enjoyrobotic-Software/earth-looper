@@ -37,9 +37,9 @@ export class Renderer {
     this.#scene = new THREE.Scene();
     this.#scene.background = new THREE.Color(this.options.background);
 
-    // Camera
-    this.#width  = this.#canvas.clientWidth  || window.innerWidth;
-    this.#height = this.#canvas.clientHeight || window.innerHeight;
+    // Camera — use parent dimensions since canvas CSS is 100%/100%
+    this.#width  = this.#canvas.parentElement?.clientWidth  || this.#canvas.clientWidth  || window.innerWidth;
+    this.#height = this.#canvas.parentElement?.clientHeight || this.#canvas.clientHeight || window.innerHeight;
     this.#camera = new THREE.PerspectiveCamera(
       this.options.fov,
       this.#width / this.#height,
@@ -57,7 +57,8 @@ export class Renderer {
     });
     this.#renderer.setPixelRatio(this.options.pixelRatio);
     this.#renderer.setSize(this.#width, this.#height);
-    this.#renderer.outputColorSpace = THREE.SRGBColorSpace;
+    // r128 uses outputEncoding; SRGBColorSpace is r152+
+    this.#renderer.outputEncoding = THREE.sRGBEncoding ?? 3001;
 
     // Clock
     this.#clock = new THREE.Clock();

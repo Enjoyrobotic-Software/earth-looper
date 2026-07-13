@@ -10,7 +10,7 @@ import * as THREE      from 'https://cdn.jsdelivr.net/npm/three@0.128.0/build/th
 import bus, { Events } from '../../core/eventBus.js';
 import cache           from '../../core/cache.js';
 
-const TOPO_URL = 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json';
+const TOPO_URL = './node_modules/world-atlas/countries-110m.json';
 const RADIUS   = 1.0015;  // slightly above surface
 
 export class BorderLayer {

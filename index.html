@@ -13,10 +13,10 @@
   --accent:#e8c97a; --mono:'JetBrains Mono',monospace; --sans:'Inter',sans-serif;
 }
 html,body { width:100%; height:100%; overflow:hidden; background:var(--ink); color:var(--body); font-family:var(--sans); }
-canvas { display:block; touch-action:none; }
+canvas { display:block; width:100%; height:100%; touch-action:none; }
 #vig  { position:fixed; inset:0; pointer-events:none; z-index:3;
         background:radial-gradient(ellipse at 50% 40%,transparent 50%,rgba(0,0,0,0.55) 100%); }
-#wrap { position:fixed; inset:0; transition:bottom .42s cubic-bezier(.32,0,.12,1); }
+#wrap { position:fixed; inset:0; transition:bottom .42s cubic-bezier(.32,0,.12,1); display:flex; }
 #wrap.panel-open { bottom:55vh; }
 @media(min-width:640px){ #wrap.panel-open { bottom:0; } }
 
@@ -79,14 +79,21 @@ canvas { display:block; touch-action:none; }
 }
 </style>
 <link rel="manifest" href="manifest.json">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="assets/fonts.css">
+<!-- Redirect all Three.js CDN imports to local node_modules (no internet required) -->
+<script type="importmap">
+{
+  "imports": {
+    "https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.module.js": "./node_modules/three/build/three.module.js"
+  }
+}
+</script>
 </head>
 <body>
 <!-- Boot screen -->
 <div id="eos-boot">
   <div class="eos-boot-logo">EARTH<span>OS</span></div>
-  <div class="eos-boot-sub">Digital Twin v5 · Sprint 9</div>
+  <div class="eos-boot-sub">Digital Twin v5 · Offline Mode</div>
   <div class="eos-boot-bar"><div class="eos-boot-fill"></div></div>
 </div>
 
@@ -106,11 +113,12 @@ canvas { display:block; touch-action:none; }
   <div id="sr"></div>
 </div>
 
-<!-- Three.js -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-
 <!-- EarthOS Bootstrap -->
 <script type="module">
+// Three.js — loaded as ES module, exposed as window.THREE for legacy plugins
+import * as _THREE from './node_modules/three/build/three.module.js';
+window.THREE = _THREE;
+
 // ── Core ───────────────────────────────────────────────────────────────────
 import engine                           from './core/engine.js';
 import { workerPool }                   from './core/workerPool.js';
@@ -354,7 +362,7 @@ timeEngine.goLive();
 const bootEl = document.getElementById('eos-boot');
 if (bootEl) {
   bootEl.classList.add('fade');
-  setTimeout(() => bootEl.remove(), 600);
+  setTimeout(() => { bootEl.remove(); assistantApp.launch(); }, 700);
 }
 
 console.timeEnd('[EarthOS] boot');

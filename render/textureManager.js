@@ -16,7 +16,7 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.module.js';
 
 const LOCAL_BASE = './assets/';
-const CDN_BASE   = 'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r128/examples/textures/';
+const CDN_BASE   = null; // CDN disabled — local textures in assets/ are used
 
 const TEXTURE_MAP = {
   earth_day:      { local:'earth_atmos_2048.jpg',  cdn:'land_ocean_ice_lights_2048.jpg',  fallbackColor: 0x2233aa },
@@ -45,8 +45,8 @@ export async function getTexture(name) {
     return await loadTexture(LOCAL_BASE + def.local);
   } catch {}
 
-  // Try CDN
-  if (def.cdn) {
+  // Try CDN (only if CDN_BASE is set)
+  if (CDN_BASE && def.cdn) {
     try { return await loadTexture(CDN_BASE + def.cdn); } catch {}
   }
 

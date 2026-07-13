@@ -10,5 +10,9 @@
   },
   "devDependencies": {
     "vitest": "^1.6.1"
+  },
+  "dependencies": {
+    "three": "^0.128.0",
+    "world-atlas": "^2.0.2"
   }
 }
