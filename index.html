@@ -155,6 +155,7 @@ import CountryCompare                   from './ui/countryCompare.js';
 import PerfMonitor                      from './ui/perfMonitor.js';
 import KeyboardShortcuts                from './ui/keyboardShortcuts.js';
 import LiveIndicator                    from './ui/liveIndicator.js';
+import { StatsHUD }                     from './ui/statsHUD.js';
 import windowManager                    from './ui/windowManager.js';
 import Dock                             from './ui/dock.js';
 import contextMenu                      from './ui/contextMenu.js';
@@ -240,6 +241,7 @@ const countryComp   = new CountryCompare();
 const perfMonitor   = new PerfMonitor();
 const shortcuts     = new KeyboardShortcuts();
 const liveIndicator = new LiveIndicator();
+const statsHUD      = new StatsHUD();
 
 panel.init();
 layerBar.init();
@@ -253,6 +255,7 @@ countryComp.init();
 perfMonitor.init();
 shortcuts.init();
 liveIndicator.init();
+statsHUD.init();
 
 // ── Window Manager + Context Menu ─────────────────────────────────────────
 windowManager.init();

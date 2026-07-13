@@ -111,16 +111,37 @@ export class GlobePlugin {
   }
 
   #buildAtmosphere(THREE) {
-    const geo = new THREE.SphereGeometry(RADIUS * 1.025, 64, 64);
-    const mat = new THREE.MeshPhongMaterial({
-      color:       new THREE.Color(0x4488ff),
+    // Fresnel rim-glow: ShaderMaterial on a back-face sphere
+    // The dot(viewDir, normal) = 0 at the silhouette → pure glow
+    const geo = new THREE.SphereGeometry(RADIUS * 1.04, 64, 64);
+    const mat = new THREE.ShaderMaterial({
+      vertexShader: `
+        varying vec3 vNormal;
+        varying vec3 vViewDir;
+        void main() {
+          vec4 worldPos = modelMatrix * vec4(position, 1.0);
+          vNormal   = normalize(mat3(modelMatrix) * normal);
+          vViewDir  = normalize(cameraPosition - worldPos.xyz);
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        varying vec3 vNormal;
+        varying vec3 vViewDir;
+        void main() {
+          float rim = 1.0 - max(dot(vViewDir, vNormal), 0.0);
+          float glow = pow(rim, 3.5) * 0.9;
+          vec3 color = mix(vec3(0.15, 0.45, 1.0), vec3(0.05, 0.15, 0.55), rim);
+          gl_FragColor = vec4(color, glow);
+        }
+      `,
       transparent: true,
-      opacity:     0.13,
       depthWrite:  false,
       side:        THREE.BackSide,
+      blending:    THREE.AdditiveBlending,
     });
     this.#atmosphere = new THREE.Mesh(geo, mat);
-    this.#scene.add(this.#atmosphere);   // world space — no rota con el globo
+    this.#scene.add(this.#atmosphere);   // world space — does not rotate with globe
   }
 
   #buildClouds(THREE) {
