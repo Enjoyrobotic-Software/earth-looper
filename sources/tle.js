@@ -13,24 +13,16 @@ import bus, { Events }            from '../core/eventBus.js';
 import scheduler, { Intervals }  from '../core/scheduler.js';
 import spatialIndex               from '../core/spatialIndex.js';
 
-// CelesTrak GP data (JSON format, much easier than TLE text)
-const CATALOGS = {
-  stations:  'https://celestrak.org/SOCRATES/query.php?CODE=ISS&FORMAT=JSON',
-  iss:       'https://celestrak.org/SATCAT/search.php?INTDES=1998-067&FORMAT=JSON',
-  starlink:  'https://celestrak.org/SATCAT/search.php?OBJECT-NAME=STARLINK&FORMAT=JSON',
-  gps:       'https://celestrak.org/SATCAT/search.php?OBJECT-NAME=GPS&FORMAT=JSON',
-  // Primary source: GP (TLE-compatible) JSON
-  active:    'https://celestrak.org/SATCAT/search.php?STATUS=alive&FORMAT=JSON',
-};
+// Real-time ISS position (CORS-friendly, no TLE needed)
+const ISS_API = 'https://api.wheretheiss.at/v1/satellites/25544';
 
-// TLE text feeds (more reliable than SATCAT for orbital elements)
+// CelesTrak TLE text feeds (corrected paths, best-effort — may CORS-block in browser)
 const TLE_FEEDS = {
-  stations: 'https://celestrak.org/SATCAT/groups/stations.txt',
-  starlink: 'https://celestrak.org/SATCAT/groups/starlink.txt',
-  gps_ops:  'https://celestrak.org/SATCAT/groups/gps-ops.txt',
-  galileo:  'https://celestrak.org/SATCAT/groups/galileo.txt',
-  weather:  'https://celestrak.org/SATCAT/groups/weather.txt',
-  active:   'https://celestrak.org/SATCAT/groups/active.txt',
+  stations: 'https://celestrak.org/pub/TLE/stations.txt',
+  starlink: 'https://celestrak.org/pub/TLE/starlink.txt',
+  gps_ops:  'https://celestrak.org/pub/TLE/gps-ops.txt',
+  galileo:  'https://celestrak.org/pub/TLE/galileo.txt',
+  weather:  'https://celestrak.org/pub/TLE/weather.txt',
 };
 
 // Minimal SGP4 propagator (Vallado algorithm, compact implementation)
@@ -110,11 +102,13 @@ export class TLESource extends BaseSource {
 
   async connect() {
     await super.connect();
-    // Refresh TLEs every 24h
+    // Real-time ISS via wheretheiss.at (CORS-friendly) — every 30 s
+    scheduler.register('tle:iss', () => this.#fetchISS(), 30_000, { immediate: true });
+    // Best-effort CelesTrak TLE refresh every 24h
     scheduler.register('tle:refresh', () => this.#refreshTLEs(), Intervals.SPACE, {
       immediate: true,
     });
-    // Propagate positions every 10s
+    // Propagate TLE-loaded satellites every 10s
     scheduler.register('tle:propagate', () => this.#propagateAll(), Intervals.SATELLITES, {
       immediate: false,
       retries: 0,
@@ -122,6 +116,7 @@ export class TLESource extends BaseSource {
   }
 
   async disconnect() {
+    scheduler.unregister('tle:iss');
     scheduler.unregister('tle:refresh');
     scheduler.unregister('tle:propagate');
     await super.disconnect();
@@ -129,6 +124,33 @@ export class TLESource extends BaseSource {
 
   async fetch()  { return null; }
   normalize(raw) { return []; }
+
+  async #fetchISS() {
+    try {
+      const d = await this.fetchJSON(ISS_API, { ttl: 25_000 });
+      const lat = d.latitude, lon = d.longitude;
+      if (isNaN(lat) || isNaN(lon)) return;
+      const ev = new EarthEvent('satellite', {
+        id: 'sat_25544',
+        lat, lon,
+        time: Date.now(),
+        title: 'ISS (ZARYA)',
+        source: 'tle',
+        detail: {
+          noradId: '25544',
+          catalog: 'stations',
+          altitude: Math.round(d.altitude ?? 408),
+          velocity: Math.round(d.velocity ?? 27600),
+          name: 'ISS',
+        },
+        ttl: 35_000,
+      });
+      this.#tles.set('25544_live', { name: 'ISS', live: true });
+      spatialIndex.layer('satellites').update({ id: 'sat_25544', lat, lon, ref: ev });
+      bus.emit(Events.SATELLITE_UPDATE, { count: 1, events: [ev] });
+      bus.emit(Events.LAYER_DATA_READY, { id: 'satellites', count: 1, events: [ev] });
+    } catch { /* wheretheiss.at unreachable */ }
+  }
 
   async #refreshTLEs() {
     for (const cat of this.#cats) {

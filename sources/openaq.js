@@ -1,8 +1,8 @@
 /**
  * EarthOS Source: OpenAQ — global air quality measurements
- * API: https://docs.openaq.org/
- * Rate: 15 min. No key required (v2 public).
- * Parameters: PM2.5, PM10, O3, NO2, SO2, CO
+ * API: https://docs.openaq.org/ (v3)
+ * Rate: 15 min. No key required (rate-limited at 60 req/min).
+ * Parameters: PM2.5 (id=2), PM10 (id=3), NO2 (id=5), O3 (id=4)
  */
 
 import { BaseSource, EarthEvent } from './base.js';
@@ -10,12 +10,15 @@ import bus, { Events }            from '../core/eventBus.js';
 import scheduler, { Intervals }  from '../core/scheduler.js';
 import spatialIndex               from '../core/spatialIndex.js';
 
-const BASE = 'https://api.openaq.org/v2';
+const BASE = 'https://api.openaq.org/v3';
+
+// OpenAQ v3 parameter IDs
+const PARAM_IDS = { pm25: 2, pm10: 3, o3: 4, no2: 5, so2: 6, co: 7 };
 
 const AQI_BREAKPOINTS = {
   pm25: [
-    [0, 12,    0,   50,  'Good'],
-    [12.1, 35.4, 51, 100, 'Moderate'],
+    [0,    12,    0,   50, 'Good'],
+    [12.1, 35.4, 51,  100, 'Moderate'],
     [35.5, 55.4, 101, 150, 'USG'],
     [55.5, 150.4, 151, 200, 'Unhealthy'],
     [150.5, 250.4, 201, 300, 'Very Unhealthy'],
@@ -34,13 +37,13 @@ function calcAQI(pm25) {
 }
 
 export class OpenAQSource extends BaseSource {
-  #country;
   #param;
+  #paramId;
 
   constructor(options = {}) {
     super('openaq', options);
-    this.#country = options.country ?? null; // null = global
     this.#param   = options.param   ?? 'pm25';
+    this.#paramId = PARAM_IDS[this.#param] ?? 2;
   }
 
   async connect() {
@@ -54,54 +57,54 @@ export class OpenAQSource extends BaseSource {
   }
 
   async fetch() {
-    let url = `${BASE}/latest?parameter=${this.#param}&limit=1000`;
-    if (this.#country) url += `&country=${this.#country}`;
+    // v3: locations endpoint returns location list with latest sensor readings
+    const url = `${BASE}/locations?parameters_id=${this.#paramId}&limit=1000`;
     return this.fetchJSON(url, { ttl: 14 * 60_000 });
   }
 
   normalize(data) {
     const events = [];
 
-    for (const station of data.results ?? []) {
-      const { coordinates, country, city, location } = station;
-      if (!coordinates?.latitude || !coordinates?.longitude) continue;
+    for (const loc of data.results ?? []) {
+      const lat = loc.coordinates?.latitude;
+      const lon = loc.coordinates?.longitude;
+      if (!lat || !lon) continue;
 
-      const lat = coordinates.latitude;
-      const lon = coordinates.longitude;
+      for (const sensor of loc.sensors ?? []) {
+        if (sensor.parameter?.name !== this.#param) continue;
+        const value = sensor.latest?.value;
+        if (value == null || value < 0) continue;
 
-      for (const m of station.measurements ?? []) {
-        if (m.parameter !== this.#param) continue;
-        const value = m.value;
-        if (value < 0) continue;
-
-        const { aqi, label } = m.parameter === 'pm25'
+        const { aqi, label } = this.#param === 'pm25'
           ? calcAQI(value)
-          : { aqi: value, label: m.parameter.toUpperCase() };
+          : { aqi: value, label: this.#param.toUpperCase() };
 
-        const id = `aq_${station.location?.replace(/\s+/g,'_')}_${m.parameter}`;
+        const city    = loc.locality ?? loc.name ?? '';
+        const country = loc.country?.code ?? '';
+        const id      = `aq_${loc.id}_${sensor.id}`;
+        const time    = new Date(sensor.latest?.datetime?.utc ?? Date.now()).getTime();
 
         const ev = new EarthEvent('pollution', {
           id, lat, lon,
           magnitude: aqi,
-          time: new Date(m.lastUpdated ?? Date.now()).getTime(),
-          title: `AQI ${aqi} (${label}) — ${city ?? country}`,
+          time,
+          title: `AQI ${aqi} (${label}) — ${city || country}`,
           source: 'openaq',
           detail: {
-            parameter: m.parameter,
+            parameter: this.#param,
             value,
-            unit:       m.unit,
+            unit:       sensor.parameter?.units ?? 'µg/m³',
             aqi,
             label,
             country,
             city,
-            location,
+            location:  loc.name,
           },
           ttl: 3_600_000,
         });
 
         events.push(ev);
         spatialIndex.layer('pollution').update({ id, lat, lon, ref: ev });
-
         if (aqi > 200) bus.emit(Events.POLLUTION, ev);
       }
     }
