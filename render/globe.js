@@ -47,6 +47,7 @@ export class GlobePlugin {
     scene.add(this.#rotGroup);
     scene.userData.rotGroup = this.#rotGroup;
 
+    this.#buildStars(THREE);
     this.#buildGlobe(THREE);
     this.#buildAtmosphere(THREE);
     this.#buildClouds(THREE);
@@ -106,17 +107,44 @@ export class GlobePlugin {
     getTexture('earth_normal').then(t   => { applyAniso(t); mat.normalMap   = t; mat.needsUpdate = true; }).catch(() => {});
     getTexture('earth_specular').then(t => { applyAniso(t); mat.specularMap = t; mat.needsUpdate = true; }).catch(() => {});
 
-    // Lighting
-    const ambient = new THREE.AmbientLight(0x303050, 0.6);
-    const sun     = new THREE.DirectionalLight(0xfff8e7, 1.4);
+    // Lighting — warm sunlight + dim space ambient
+    const ambient = new THREE.AmbientLight(0x182840, 0.45);
+    const sun     = new THREE.DirectionalLight(0xfff4d6, 1.8);
     sun.position.set(5, 3, 5);
-    this.#scene.add(ambient, sun);
+    // Soft back-fill from space (very dim blue)
+    const fill = new THREE.DirectionalLight(0x1a3060, 0.18);
+    fill.position.set(-4, -2, -3);
+    this.#scene.add(ambient, sun, fill);
   }
 
   #buildAtmosphere(THREE) {
-    // Fresnel rim-glow: ShaderMaterial on a back-face sphere
-    // The dot(viewDir, normal) = 0 at the silhouette → pure glow
-    const geo = new THREE.SphereGeometry(RADIUS * 1.04, 64, 64);
+    // Outer halo (Back-face, large, soft)
+    const geoOuter = new THREE.SphereGeometry(RADIUS * 1.12, 64, 64);
+    const matOuter = new THREE.ShaderMaterial({
+      vertexShader: `
+        varying vec3 vNormal;
+        varying vec3 vViewDir;
+        void main() {
+          vec4 worldPos = modelMatrix * vec4(position, 1.0);
+          vNormal  = normalize(mat3(modelMatrix) * normal);
+          vViewDir = normalize(cameraPosition - worldPos.xyz);
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }`,
+      fragmentShader: `
+        varying vec3 vNormal;
+        varying vec3 vViewDir;
+        void main() {
+          float rim  = 1.0 - max(dot(vViewDir, vNormal), 0.0);
+          float glow = pow(rim, 4.5) * 0.55;
+          gl_FragColor = vec4(0.18, 0.52, 1.0, glow);
+        }`,
+      transparent: true, depthWrite: false,
+      side: THREE.BackSide, blending: THREE.AdditiveBlending,
+    });
+    this.#scene.add(new THREE.Mesh(geoOuter, matOuter));
+
+    // Inner fresnel (tighter rim, brighter, cyan tint)
+    const geo = new THREE.SphereGeometry(RADIUS * 1.035, 64, 64);
     const mat = new THREE.ShaderMaterial({
       vertexShader: `
         varying vec3 vNormal;
@@ -126,25 +154,49 @@ export class GlobePlugin {
           vNormal   = normalize(mat3(modelMatrix) * normal);
           vViewDir  = normalize(cameraPosition - worldPos.xyz);
           gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-        }
-      `,
+        }`,
       fragmentShader: `
         varying vec3 vNormal;
         varying vec3 vViewDir;
         void main() {
-          float rim = 1.0 - max(dot(vViewDir, vNormal), 0.0);
-          float glow = pow(rim, 3.5) * 0.9;
-          vec3 color = mix(vec3(0.15, 0.45, 1.0), vec3(0.05, 0.15, 0.55), rim);
-          gl_FragColor = vec4(color, glow);
-        }
-      `,
-      transparent: true,
-      depthWrite:  false,
-      side:        THREE.BackSide,
-      blending:    THREE.AdditiveBlending,
+          float rim  = 1.0 - max(dot(vViewDir, vNormal), 0.0);
+          float glow = pow(rim, 2.8) * 1.1;
+          vec3  col  = mix(vec3(0.20, 0.60, 1.00), vec3(0.50, 0.85, 1.00), rim * rim);
+          gl_FragColor = vec4(col, glow);
+        }`,
+      transparent: true, depthWrite: false,
+      side: THREE.BackSide, blending: THREE.AdditiveBlending,
     });
     this.#atmosphere = new THREE.Mesh(geo, mat);
-    this.#scene.add(this.#atmosphere);   // world space — does not rotate with globe
+    this.#scene.add(this.#atmosphere);
+  }
+
+  #buildStars(THREE) {
+    const count = 6000;
+    const pos   = new Float32Array(count * 3);
+    const col   = new Float32Array(count * 3);
+    for (let i = 0; i < count; i++) {
+      // Random point on sphere, radius 80–120
+      const r     = 80 + Math.random() * 40;
+      const theta = Math.random() * Math.PI * 2;
+      const phi   = Math.acos(2 * Math.random() - 1);
+      pos[i*3]   = r * Math.sin(phi) * Math.cos(theta);
+      pos[i*3+1] = r * Math.cos(phi);
+      pos[i*3+2] = r * Math.sin(phi) * Math.sin(theta);
+      // Slight color variation: blue-white to warm-white
+      const t = Math.random();
+      col[i*3]   = 0.75 + t * 0.25;
+      col[i*3+1] = 0.80 + t * 0.18;
+      col[i*3+2] = 0.90 + (1-t) * 0.10;
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute('color',    new THREE.BufferAttribute(col, 3));
+    const mat = new THREE.PointsMaterial({
+      size: 0.18, vertexColors: true,
+      transparent: true, opacity: 0.9, sizeAttenuation: true,
+    });
+    this.#scene.add(new THREE.Points(geo, mat));
   }
 
   #buildClouds(THREE) {

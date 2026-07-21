@@ -22,7 +22,7 @@ export class Renderer {
     this.options = {
       antialias:   options.antialias   ?? true,
       pixelRatio:  options.pixelRatio  ?? Math.min(devicePixelRatio, 2),
-      background:  options.background  ?? 0x0b0f14,
+      background:  options.background  ?? 0x020408,
       fov:         options.fov         ?? 45,
       near:        options.near        ?? 0.1,
       far:         options.far         ?? 50,

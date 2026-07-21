@@ -1,96 +1,184 @@
 /**
- * EarthOS ConflictLayer — renders armed conflict zones as pulsing cross markers.
- * Data: ACLEDSource → LAYER_DATA_READY { id:'conflicts' }
- * Color: per ACLED event type (Battles=red, Explosions=orange, etc.)
+ * EarthOS ConflictLayer — glowing conflict markers with expanding ring pulses.
+ * Uses custom ShaderMaterial on THREE.Points for GPU-efficient glow effect.
+ * Colors encode ACLED event type. No vertex-color merge bug.
  */
 
-import * as THREE      from 'https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.module.js';
 import bus, { Events } from '../../core/eventBus.js';
 import { latLonToXYZ } from '../globe.js';
 
-const MAX    = 500;
-const RADIUS = 1.0;
+const MAX = 500;
+const R   = 1.004;
 
-function typeColor(type) {
-  return {
-    'Battles':         '#e05555',
-    'Explosions':      '#ff8800',
-    'Violence vs Civ': '#d4854a',
-    'Protests':        '#4a90d4',
-    'Riots':           '#9c6dd4',
-    'Strategic Devs':  '#4caf7d',
-  }[type] ?? '#aaaaaa';
-}
+// Event type → RGB color
+const TYPE_COLORS = {
+  'Battles':         [0.88, 0.21, 0.21],
+  'Explosions':      [1.00, 0.53, 0.00],
+  'Violence vs Civ': [0.83, 0.52, 0.29],
+  'Protests':        [0.29, 0.56, 0.83],
+  'Riots':           [0.61, 0.43, 0.83],
+  'Strategic Devs':  [0.30, 0.69, 0.49],
+};
+const DEFAULT_COLOR = [0.85, 0.20, 0.20];
+
+// Core glow disc
+const VERT_CORE = `
+attribute vec3  aColor;
+attribute float aPhase;
+uniform   float uTime;
+varying   vec3  vColor;
+varying   float vAlpha;
+void main() {
+  vColor = aColor;
+  float pulse = 0.8 + 0.2 * sin(uTime * 2.2 + aPhase * 6.2832);
+  gl_PointSize = 9.0 * pulse;
+  vAlpha = pulse;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}`;
+
+const FRAG_CORE = `
+varying vec3  vColor;
+varying float vAlpha;
+void main() {
+  vec2  uv   = gl_PointCoord - 0.5;
+  float dist = length(uv) * 2.0;
+  if (dist > 1.0) discard;
+  float glow  = pow(1.0 - dist, 1.8);
+  float sharp = step(dist, 0.25) * 0.6;
+  gl_FragColor = vec4(vColor, (glow + sharp) * vAlpha * 0.92);
+}`;
+
+// Expanding ring pulse
+const VERT_RING = `
+attribute float aPhase;
+attribute vec3  aColor;
+uniform   float uTime;
+varying   vec3  vColor;
+varying   float vAlpha;
+void main() {
+  vColor = aColor;
+  float t     = fract(uTime * 0.42 + aPhase);
+  gl_PointSize = 6.0 + t * 32.0;
+  vAlpha = pow(1.0 - t, 1.5) * 0.75;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}`;
+
+const FRAG_RING = `
+varying vec3  vColor;
+varying float vAlpha;
+void main() {
+  if (vAlpha < 0.01) discard;
+  vec2  uv   = gl_PointCoord - 0.5;
+  float dist = length(uv) * 2.0;
+  float ring = abs(dist - 0.82);
+  float a = max(0.0, 1.0 - ring * 10.0) * vAlpha;
+  if (a < 0.01) discard;
+  gl_FragColor = vec4(vColor * 1.3, a);
+}`;
 
 export class ConflictLayer {
-  #mesh  = null;
-  #dummy = new THREE.Object3D();
-  #t     = 0;
-  #data  = [];
+  #core  = null;
+  #rings = null;
+  #uni   = { uTime: { value: 0 } };
+  #count = 0;
 
   init(scene) {
-    // Cross shape: two thin boxes merged via group
-    const barH = new THREE.BoxGeometry(0.004, 0.015, 0.001);
-    const barV = new THREE.BoxGeometry(0.015, 0.004, 0.001);
-    // Merge both into one BufferGeometry
-    const merged = this.#mergeCross(barH, barV);
-    const mat    = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.9 });
-    this.#mesh   = new THREE.InstancedMesh(merged, mat, MAX);
-    this.#mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-    this.#mesh.count = 0;
-    (scene.userData.rotGroup ?? scene).add(this.#mesh);
+    const THREE  = window.THREE;
+    const parent = scene.userData.rotGroup ?? scene;
+
+    // Shared position + attribute buffers
+    const positions = new Float32Array(MAX * 3);
+    const colors    = new Float32Array(MAX * 3);
+    const phases    = new Float32Array(MAX);
+
+    // ── Core glow dots ─────────────────────────────────────────────────
+    const geoCore = new THREE.BufferGeometry();
+    geoCore.setAttribute('position', new THREE.BufferAttribute(positions.slice(), 3));
+    geoCore.setAttribute('aColor',   new THREE.BufferAttribute(colors.slice(), 3));
+    geoCore.setAttribute('aPhase',   new THREE.BufferAttribute(phases.slice(), 1));
+
+    const matCore = new THREE.ShaderMaterial({
+      uniforms:       this.#uni,
+      vertexShader:   VERT_CORE,
+      fragmentShader: FRAG_CORE,
+      transparent:    true,
+      depthWrite:     false,
+      blending:       THREE.AdditiveBlending,
+    });
+
+    this.#core = new THREE.Points(geoCore, matCore);
+    this.#core.visible     = false;
+    this.#core.renderOrder = 4;
+    this.#core.frustumCulled = false;
+    parent.add(this.#core);
+
+    // ── Ring pulses ────────────────────────────────────────────────────
+    const geoRing = new THREE.BufferGeometry();
+    geoRing.setAttribute('position', new THREE.BufferAttribute(positions.slice(), 3));
+    geoRing.setAttribute('aColor',   new THREE.BufferAttribute(colors.slice(), 3));
+    geoRing.setAttribute('aPhase',   new THREE.BufferAttribute(phases.slice(), 1));
+
+    const matRing = new THREE.ShaderMaterial({
+      uniforms:       this.#uni,
+      vertexShader:   VERT_RING,
+      fragmentShader: FRAG_RING,
+      transparent:    true,
+      depthWrite:     false,
+      blending:       THREE.AdditiveBlending,
+    });
+
+    this.#rings = new THREE.Points(geoRing, matRing);
+    this.#rings.visible      = false;
+    this.#rings.renderOrder  = 3;
+    this.#rings.frustumCulled = false;
+    parent.add(this.#rings);
 
     bus.on(Events.LAYER_DATA_READY, d => {
       if (d.id === 'conflicts') this.#update(d.events);
     });
     bus.on(Events.LAYER_TOGGLE, ({ id, enabled }) => {
-      if (id === 'conflicts' && this.#mesh) this.#mesh.visible = enabled;
+      if (id !== 'conflicts') return;
+      if (this.#core)  this.#core.visible  = enabled && this.#count > 0;
+      if (this.#rings) this.#rings.visible = enabled && this.#count > 0;
     });
   }
 
   #update(events) {
-    if (!this.#mesh) return;
-    this.#data = events.slice(0, MAX);
-    const color = new THREE.Color();
+    if (!this.#core) return;
+    const THREE = window.THREE;
+    const list  = events.slice(0, MAX);
+    this.#count = list.length;
 
-    for (let i = 0; i < this.#data.length; i++) {
-      const ev  = this.#data[i];
-      const pos = latLonToXYZ(ev.lat, ev.lon, RADIUS + 0.002);
-      this.#dummy.position.set(pos.x, pos.y, pos.z);
-      this.#dummy.lookAt(pos.x * 2, pos.y * 2, pos.z * 2);
-      this.#dummy.updateMatrix();
-      this.#mesh.setMatrixAt(i, this.#dummy.matrix);
-      this.#mesh.setColorAt(i, color.set(typeColor(ev.detail?.type)));
+    for (const pts of [this.#core, this.#rings]) {
+      const pos = pts.geometry.attributes.position.array;
+      const col = pts.geometry.attributes.aColor.array;
+      const phi = pts.geometry.attributes.aPhase.array;
+
+      for (let i = 0; i < list.length; i++) {
+        const ev = list[i];
+        const p  = latLonToXYZ(ev.lat, ev.lon, R);
+        pos[i*3] = p.x; pos[i*3+1] = p.y; pos[i*3+2] = p.z;
+
+        const c = TYPE_COLORS[ev.detail?.type] ?? DEFAULT_COLOR;
+        col[i*3] = c[0]; col[i*3+1] = c[1]; col[i*3+2] = c[2];
+
+        phi[i] = (i * 0.618033988) % 1;  // golden-ratio phase spread
+      }
+
+      pts.geometry.attributes.position.needsUpdate = true;
+      pts.geometry.attributes.aColor.needsUpdate   = true;
+      pts.geometry.attributes.aPhase.needsUpdate   = true;
+      pts.geometry.setDrawRange(0, list.length);
     }
-
-    this.#mesh.count = this.#data.length;
-    this.#mesh.instanceMatrix.needsUpdate = true;
-    if (this.#mesh.instanceColor) this.#mesh.instanceColor.needsUpdate = true;
   }
 
   update(dt) {
-    if (!this.#mesh || !this.#data.length) return;
-    this.#t += dt;
-    // Subtle pulse: scale all markers slightly in and out
-    const s = 1 + 0.12 * Math.sin(this.#t * 0.002);
-    this.#mesh.scale.setScalar(s);
+    this.#uni.uTime.value += dt;
   }
 
-  dispose() { this.#mesh?.geometry.dispose(); this.#mesh?.material.dispose(); }
-
-  #mergeCross(geoH, geoV) {
-    const merged = new THREE.BufferGeometry();
-    const posH   = geoH.attributes.position.array;
-    const posV   = geoV.attributes.position.array;
-    const pos    = new Float32Array(posH.length + posV.length);
-    pos.set(posH); pos.set(posV, posH.length);
-    merged.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-
-    const idxH = Array.from(geoH.index.array);
-    const idxV = Array.from(geoV.index.array).map(i => i + posH.length / 3);
-    merged.setIndex([...idxH, ...idxV]);
-    merged.computeVertexNormals();
-    return merged;
+  dispose() {
+    this.#core?.geometry.dispose();  this.#core?.material.dispose();
+    this.#rings?.geometry.dispose(); this.#rings?.material.dispose();
   }
 }
 

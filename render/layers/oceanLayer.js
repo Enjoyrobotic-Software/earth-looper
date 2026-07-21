@@ -100,8 +100,8 @@ const CURRENT_DEFS = [
   },
 ];
 
-const PER_PATH    = 28;  // particles per current
-const LINE_OPACITY = 0.35;
+const PER_PATH    = 40;  // particles per current
+const LINE_OPACITY = 0.60;
 
 function sstColor(sst) {
   const THREE = window.THREE;
@@ -159,8 +159,9 @@ export class OceanLayer {
     pgeo.setAttribute('color', new THREE.BufferAttribute(pColors, 3));
 
     const pmat = new THREE.PointsMaterial({
-      size: 0.010, vertexColors: true,
-      transparent: true, opacity: 0.95, depthWrite: false, sizeAttenuation: true,
+      size: 0.026, vertexColors: true,
+      transparent: true, opacity: 1.0, depthWrite: false, sizeAttenuation: true,
+      blending: THREE.AdditiveBlending,
     });
     this.#particles = new THREE.Points(pgeo, pmat);
     this.#particles.renderOrder = 2;

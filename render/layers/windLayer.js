@@ -14,15 +14,23 @@ varying   float vSpeed;
 void main() {
   vSpeed = aSpeed;
   gl_Position  = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-  gl_PointSize = clamp(1.5 + aSpeed * 0.08, 1.0, 4.0);
+  gl_PointSize = clamp(2.0 + aSpeed * 0.12, 1.5, 6.0);
 }`;
 
 const FRAG = `
 varying float vSpeed;
 void main() {
-  float s = clamp(vSpeed / 60.0, 0.0, 1.0);
-  vec3  c = mix(vec3(0.2, 0.4, 0.8), vec3(0.9, 0.97, 1.0), s);
-  gl_FragColor = vec4(c, 0.55);
+  vec2  uv   = gl_PointCoord - 0.5;
+  float dist = length(uv) * 2.0;
+  if (dist > 1.0) discard;
+  float s = clamp(vSpeed / 55.0, 0.0, 1.0);
+  // calm = deep blue, moderate = cyan, strong = white
+  vec3 c0 = vec3(0.10, 0.30, 0.90);
+  vec3 c1 = vec3(0.20, 0.85, 1.00);
+  vec3 c2 = vec3(0.95, 0.98, 1.00);
+  vec3 c  = s < 0.5 ? mix(c0, c1, s*2.0) : mix(c1, c2, (s-0.5)*2.0);
+  float alpha = (1.0 - dist) * 0.72;
+  gl_FragColor = vec4(c, alpha);
 }`;
 
 export class WindLayer {
