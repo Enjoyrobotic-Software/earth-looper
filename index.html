@@ -372,10 +372,11 @@ console.log('[EarthOS] History:', historyBuffer.stats());
 window.EarthOS = { engine, timeEngine, causalGraph, eventAnalyzer, historyBuffer, scenarioEngine, alertEngine, assistant };
 
 // ── Service Worker (PWA) ───────────────────────────────────────────────────
+// Service worker disabled — clears any stale SW and its cache
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('./sw.js', { scope: './' })
-    .then(r => console.log('[SW] registered', r.scope))
-    .catch(e => console.warn('[SW] registration failed', e));
+  navigator.serviceWorker.getRegistrations()
+    .then(regs => Promise.all(regs.map(r => r.unregister())))
+    .catch(() => {});
 }
 
 </script>
