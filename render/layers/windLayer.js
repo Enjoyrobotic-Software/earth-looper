@@ -51,7 +51,7 @@ export class WindLayer {
 
     this.#mesh = new THREE.Points(this.#geo, mat);
     this.#mesh.renderOrder = 2;
-    scene.add(this.#mesh);
+    (scene.userData.rotGroup ?? scene).add(this.#mesh);
 
     particleSystem.start();
     this.#active = true;

@@ -17,7 +17,7 @@ const LAYER_DEFS = [
   { id:'storms',      name:'Storms',       icon:'🌀', color:'#4a90d4', sources:['noaa'],      enabled:false },
   { id:'flights',     name:'Flights',      icon:'✈️', color:'#4caf7d', sources:['opensky'],   enabled:false },
   { id:'ships',       name:'Ships',        icon:'🚢', color:'#2196f3', sources:['aisstream'], enabled:false },
-  { id:'satellites',  name:'Satellites',   icon:'🛰️', color:'#9c6dd4', sources:['tle'],       enabled:true  },
+  { id:'satellites',  name:'Satellites',   icon:'🛰️', color:'#9c6dd4', sources:['tle'],       enabled:false },
   { id:'weather',     name:'Weather',      icon:'🌦️', color:'#81d4fa', sources:['noaa'],      enabled:false },
   { id:'pollution',   name:'Pollution',    icon:'💨', color:'#78909c', sources:['openaq'],    enabled:false },
   { id:'gdp',         name:'Economy',      icon:'💰', color:'#e8c97a', sources:['worldbank'], enabled:false },

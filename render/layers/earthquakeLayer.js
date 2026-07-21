@@ -57,7 +57,6 @@ export class EarthquakeLayerRenderer {
     this.#mesh.count          = 0;
     this.#mesh.frustumCulled  = false;
     this.#mesh.visible        = false;
-    scene.add(this.#mesh);
 
     // ── Pulsing rings for M≥5 ────────────────────────────────────────────────
     const ringGeo = new THREE.TorusGeometry(1, 0.06, 4, 48);
@@ -72,7 +71,10 @@ export class EarthquakeLayerRenderer {
     this.#rings.frustumCulled = false;
     this.#rings.visible       = false;
     this.#rings.renderOrder   = 2;
-    scene.add(this.#rings);
+
+    const _g = scene.userData.rotGroup ?? scene;
+    _g.add(this.#mesh);
+    _g.add(this.#rings);
 
     // Listen for layer data
     this.#unsub = bus.on(Events.LAYER_DATA_READY, ({ id, events }) => {
@@ -123,8 +125,8 @@ export class EarthquakeLayerRenderer {
     this.#mesh.material.dispose();
     this.#rings.geometry.dispose();
     this.#rings.material.dispose();
-    this.#scene.remove(this.#mesh);
-    this.#scene.remove(this.#rings);
+    this.#mesh.parent?.remove(this.#mesh);
+    this.#rings.parent?.remove(this.#rings);
   }
 
   #update(events) {

@@ -33,7 +33,7 @@ export class FlightLayerRenderer {
     this.#mesh.count         = 0;
     this.#mesh.frustumCulled = false;
     this.#mesh.visible       = false;
-    scene.add(this.#mesh);
+    (scene.userData.rotGroup ?? scene).add(this.#mesh);
 
     this.#unsub = bus.on(Events.FLIGHT_UPDATE, ({ events }) => this.#update(events));
     bus.on(Events.LAYER_TOGGLE, ({ id, enabled }) => {
@@ -61,7 +61,7 @@ export class FlightLayerRenderer {
     this.#unsub?.();
     this.#mesh.geometry.dispose();
     this.#mesh.material.dispose();
-    this.#scene.remove(this.#mesh);
+    this.#mesh.parent?.remove(this.#mesh);
   }
 
   #update(events) {

@@ -6,6 +6,7 @@
 
 import * as THREE      from 'https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.module.js';
 import bus, { Events } from '../../core/eventBus.js';
+import { latLonToXYZ } from '../globe.js';
 
 const MAX    = 500;
 const RADIUS = 1.0;
@@ -37,7 +38,7 @@ export class ConflictLayer {
     this.#mesh   = new THREE.InstancedMesh(merged, mat, MAX);
     this.#mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.#mesh.count = 0;
-    scene.add(this.#mesh);
+    (scene.userData.rotGroup ?? scene).add(this.#mesh);
 
     bus.on(Events.LAYER_DATA_READY, d => {
       if (d.id === 'conflicts') this.#update(d.events);
@@ -53,16 +54,10 @@ export class ConflictLayer {
     const color = new THREE.Color();
 
     for (let i = 0; i < this.#data.length; i++) {
-      const ev   = this.#data[i];
-      const phi  = (90 - ev.lat) * Math.PI / 180;
-      const th   = (ev.lon + 180) * Math.PI / 180;
-      const r    = RADIUS + 0.002;
-      this.#dummy.position.set(
-        r * Math.sin(phi) * Math.cos(th),
-        r * Math.cos(phi),
-        r * Math.sin(phi) * Math.sin(th)
-      );
-      this.#dummy.lookAt(this.#dummy.position.clone().multiplyScalar(2));
+      const ev  = this.#data[i];
+      const pos = latLonToXYZ(ev.lat, ev.lon, RADIUS + 0.002);
+      this.#dummy.position.set(pos.x, pos.y, pos.z);
+      this.#dummy.lookAt(pos.x * 2, pos.y * 2, pos.z * 2);
       this.#dummy.updateMatrix();
       this.#mesh.setMatrixAt(i, this.#dummy.matrix);
       this.#mesh.setColorAt(i, color.set(typeColor(ev.detail?.type)));

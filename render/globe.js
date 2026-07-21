@@ -45,6 +45,7 @@ export class GlobePlugin {
     this.#raycaster = new THREE.Raycaster();
     this.#rotGroup  = new THREE.Group();
     scene.add(this.#rotGroup);
+    scene.userData.rotGroup = this.#rotGroup;
 
     this.#buildGlobe(THREE);
     this.#buildAtmosphere(THREE);
@@ -99,9 +100,11 @@ export class GlobePlugin {
     this.#rotGroup.add(this.#globe);
 
     // Async texture loading — CDN fallback via textureManager
-    getTexture('earth_day').then(t      => { mat.map         = t; mat.color.setHex(0xffffff); mat.needsUpdate = true; }).catch(() => {});
-    getTexture('earth_normal').then(t   => { mat.normalMap   = t; mat.needsUpdate = true; }).catch(() => {});
-    getTexture('earth_specular').then(t => { mat.specularMap = t; mat.needsUpdate = true; }).catch(() => {});
+    const maxAniso = this.#renderer.capabilities.getMaxAnisotropy();
+    const applyAniso = t => { t.anisotropy = maxAniso; t.needsUpdate = true; return t; };
+    getTexture('earth_day').then(t      => { applyAniso(t); mat.map         = t; mat.color.setHex(0xffffff); mat.needsUpdate = true; }).catch(() => {});
+    getTexture('earth_normal').then(t   => { applyAniso(t); mat.normalMap   = t; mat.needsUpdate = true; }).catch(() => {});
+    getTexture('earth_specular').then(t => { applyAniso(t); mat.specularMap = t; mat.needsUpdate = true; }).catch(() => {});
 
     // Lighting
     const ambient = new THREE.AmbientLight(0x303050, 0.6);
@@ -151,7 +154,7 @@ export class GlobePlugin {
     });
     this.#clouds = new THREE.Mesh(geo, mat);
     this.#rotGroup.add(this.#clouds);
-    getTexture('earth_clouds').then(t => { mat.map = t; mat.needsUpdate = true; }).catch(() => {});
+    getTexture('earth_clouds').then(t => { t.anisotropy = this.#renderer.capabilities.getMaxAnisotropy(); mat.map = t; mat.needsUpdate = true; }).catch(() => {});
   }
 
 
@@ -199,7 +202,10 @@ export class GlobePlugin {
 
   #onWheel(delta) {
     const z = this.#camera.position.z + delta * 0.002;
-    this.#camera.position.z = Math.max(1.15, Math.min(8, z));
+    this.#camera.position.z = Math.max(1.05, Math.min(8, z));
+    // Tighten near plane when zoomed in to preserve depth precision
+    this.#camera.near = Math.max(0.001, (this.#camera.position.z - 1.0) * 0.1);
+    this.#camera.updateProjectionMatrix();
   }
 
   #onClick(x, y, shiftKey = false) {

@@ -70,7 +70,7 @@ export class ParticleSystem {
     const phi   = (90 - lat) * Math.PI / 180;
     const theta = (lon + 180) * Math.PI / 180;
     const r     = 1.001;   // just above surface
-    this.#positions[i * 3]     = r * Math.sin(phi) * Math.cos(theta);
+    this.#positions[i * 3]     = -(r * Math.sin(phi) * Math.cos(theta));
     this.#positions[i * 3 + 1] = r * Math.cos(phi);
     this.#positions[i * 3 + 2] = r * Math.sin(phi) * Math.sin(theta);
   }

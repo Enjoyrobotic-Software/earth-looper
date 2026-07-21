@@ -52,7 +52,7 @@ export class FireLayerRenderer {
     this.#mesh.count         = 0;
     this.#mesh.frustumCulled = false;
     this.#mesh.visible       = false;
-    scene.add(this.#mesh);
+    (scene.userData.rotGroup ?? scene).add(this.#mesh);
 
     this.#unsub.push(bus.on(Events.LAYER_DATA_READY, ({ id, events }) => {
       if (id === 'fires') this.#update(events);

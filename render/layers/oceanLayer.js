@@ -5,6 +5,7 @@
  */
 
 import bus, { Events } from '../../core/eventBus.js';
+import { latLonToXYZ } from '../globe.js';
 
 const MAX = 300;
 const R   = 1.0;
@@ -34,7 +35,7 @@ export class OceanLayer {
     this.#mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.#mesh.renderOrder = 1;
     this.#mesh.count = 0;
-    scene.add(this.#mesh);
+    (scene.userData.rotGroup ?? scene).add(this.#mesh);
 
     bus.on(Events.LAYER_DATA_READY, data => {
       if (data.id === 'ocean' && data.type === 'sst_grid') this.#update(data.events);
@@ -53,16 +54,10 @@ export class OceanLayer {
 
     for (let i = 0; i < count; i++) {
       const { lat, lon, sst } = grid[i];
-      const phi   = (90 - lat) * Math.PI / 180;
-      const theta = (lon + 180) * Math.PI / 180;
-      const r     = R + 0.001;
+      const pos = latLonToXYZ(lat, lon, R + 0.001);
 
-      this.#dummy.position.set(
-        r * Math.sin(phi) * Math.cos(theta),
-        r * Math.cos(phi),
-        r * Math.sin(phi) * Math.sin(theta)
-      );
-      this.#dummy.lookAt(0, 0, 0);
+      this.#dummy.position.set(pos.x, pos.y, pos.z);
+      this.#dummy.lookAt(pos.x * 2, pos.y * 2, pos.z * 2);
       this.#dummy.updateMatrix();
       this.#mesh.setMatrixAt(i, this.#dummy.matrix);
       this.#mesh.setColorAt(i, sstColor(sst));

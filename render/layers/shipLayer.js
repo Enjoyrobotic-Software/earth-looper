@@ -47,7 +47,7 @@ export class ShipLayerRenderer {
     this.#mesh.count         = 0;
     this.#mesh.frustumCulled = false;
     this.#mesh.visible       = false;
-    scene.add(this.#mesh);
+    (scene.userData.rotGroup ?? scene).add(this.#mesh);
 
     this.#unsub.push(bus.on(Events.LAYER_DATA_READY, ({ id, events }) => {
       if (id === 'ships') this.#batch(events);
@@ -64,7 +64,7 @@ export class ShipLayerRenderer {
     for (const u of this.#unsub) u?.();
     this.#mesh.geometry.dispose();
     this.#mesh.material.dispose();
-    this.#scene.remove(this.#mesh);
+    this.#mesh.parent?.remove(this.#mesh);
   }
 
   #batch(events) {
