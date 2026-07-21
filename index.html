@@ -344,11 +344,17 @@ canvas.addEventListener('contextmenu', e => {
   ]);
 });
 
-// ── Restore persisted layer states ────────────────────────────────────────
+// ── Sync initial layer visibility with LAYER_DEFS enabled states ─────────
+// Renderers start with visible=false; this fires the initial toggle so
+// layers marked enabled:true become visible without requiring user interaction.
+for (const layer of engine.layers.all()) {
+  bus.emit(Events.LAYER_TOGGLE, { id: layer.id, enabled: layer.enabled });
+}
+
+// ── Restore persisted layer states (overrides defaults) ──────────────────
 for (const layer of engine.status().layers) {
   const saved = persistence.load(`layer_${layer.id}`);
-  if (saved !== null && saved !== layer.enabled)
-    bus.emit(Events.LAYER_TOGGLE, { id: layer.id, enabled: saved });
+  if (saved !== null) bus.emit(Events.LAYER_TOGGLE, { id: layer.id, enabled: saved });
 }
 
 // ── Start ─────────────────────────────────────────────────────────────────

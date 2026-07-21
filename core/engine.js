@@ -12,17 +12,17 @@ import cache               from './cache.js';
 // ── Layer definitions ────────────────────────────────────────────────────────
 const LAYER_DEFS = [
   { id:'earthquakes', name:'Earthquakes',  icon:'🔴', color:'#e05555', sources:['usgs'],      enabled:true  },
-  { id:'volcanoes',   name:'Volcanoes',    icon:'🌋', color:'#d4854a', sources:['gvp'],       enabled:false },
+  { id:'volcanoes',   name:'Volcanoes',    icon:'🌋', color:'#d4854a', sources:['gvp'],       enabled:true  },
   { id:'fires',       name:'Fires',        icon:'🔥', color:'#ff6b35', sources:['firms'],     enabled:false },
   { id:'storms',      name:'Storms',       icon:'🌀', color:'#4a90d4', sources:['noaa'],      enabled:false },
   { id:'flights',     name:'Flights',      icon:'✈️', color:'#4caf7d', sources:['opensky'],   enabled:false },
   { id:'ships',       name:'Ships',        icon:'🚢', color:'#2196f3', sources:['aisstream'], enabled:false },
   { id:'satellites',  name:'Satellites',   icon:'🛰️', color:'#9c6dd4', sources:['tle'],       enabled:false },
   { id:'weather',     name:'Weather',      icon:'🌦️', color:'#81d4fa', sources:['noaa'],      enabled:false },
-  { id:'pollution',   name:'Pollution',    icon:'💨', color:'#78909c', sources:['openaq'],    enabled:false },
+  { id:'pollution',   name:'Pollution',    icon:'💨', color:'#78909c', sources:['openaq'],    enabled:true  },
   { id:'gdp',         name:'Economy',      icon:'💰', color:'#e8c97a', sources:['worldbank'], enabled:false },
-  { id:'ocean',       name:'Ocean SST',    icon:'🌊', color:'#0077b6', sources:['copernicus'],enabled:false },
-  { id:'conflicts',   name:'Conflicts',    icon:'⚔️', color:'#880e4f', sources:['acled'],     enabled:false },
+  { id:'ocean',       name:'Ocean SST',    icon:'🌊', color:'#0077b6', sources:['copernicus'],enabled:true  },
+  { id:'conflicts',   name:'Conflicts',    icon:'⚔️', color:'#880e4f', sources:['acled'],     enabled:true  },
   { id:'borders',    name:'Borders',      icon:'🗺️', color:'#445566', sources:[],            enabled:true  },
   { id:'night',      name:'Night Side',   icon:'🌑', color:'#000510', sources:[],            enabled:true  },
 ];
