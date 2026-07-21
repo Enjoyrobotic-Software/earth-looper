@@ -44,11 +44,11 @@ canvas { display:block; width:100%; height:100%; touch-action:none; }
        display:flex; align-items:center; gap:8px; }
 .sri:hover { background:rgba(255,255,255,.06); }
 
-/* Floating clock HUD */
-#eos-clock-hud {
-  position:fixed; top:16px; right:16px; z-index:21;
-  font-family:var(--mono); font-size:11px; color:rgba(255,255,255,0.32);
-  letter-spacing:.1em; pointer-events:none;
+/* Top bar clock */
+#eos-clk {
+  flex-shrink:0; font-family:var(--mono); font-size:10px;
+  color:rgba(255,255,255,0.28); letter-spacing:.1em; white-space:nowrap;
+  padding-left:12px;
 }
 
 /* Boot screen */
@@ -105,9 +105,6 @@ canvas { display:block; width:100%; height:100%; touch-action:none; }
   <div class="brand"><b>EARTH</b>OS <span style="opacity:.4">v5</span></div>
   <button id="eos-layers-btn"></button>
 </div>
-
-<!-- Clock HUD -->
-<div id="eos-clock-hud"></div>
 
 <!-- Search -->
 <div id="swrap">
@@ -325,8 +322,10 @@ bus.on(Events.COUNTRY_SELECTED, ({ lat, lon, country }) => {
   if (nearest && best < 15) panel.showCountry(nearest);
 });
 
-// ── UTC clock ─────────────────────────────────────────────────────────────
-const clk  = document.getElementById('eos-clock-hud');
+// ── UTC clock — appended to top bar after dock ────────────────────────────
+const clk = document.createElement('div');
+clk.id = 'eos-clk';
+document.getElementById('top')?.appendChild(clk);
 const tick = () => { clk.textContent = new Date().toUTCString().slice(17,25) + ' UTC'; };
 tick(); setInterval(tick, 1000);
 
