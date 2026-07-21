@@ -4,29 +4,32 @@
  * Color: -2°C (deep blue) → 0 (cyan) → 15 (green) → 28 (orange) → 35°C (red)
  */
 
-import * as THREE      from 'https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.module.js';
 import bus, { Events } from '../../core/eventBus.js';
 
-const MAX  = 300;
-const R    = 1.0;
+const MAX = 300;
+const R   = 1.0;
 
 function sstColor(sst) {
+  const THREE = window.THREE;
   const t = Math.max(0, Math.min(1, (sst + 2) / 37));
-  if (t < 0.25) return new THREE.Color().setHSL(0.67, 1.0, 0.3 + t * 0.8);  // blue
-  if (t < 0.5)  return new THREE.Color().setHSL(0.45, 1.0, 0.4);             // cyan-green
-  if (t < 0.75) return new THREE.Color().setHSL(0.10, 1.0, 0.5);             // orange
-  return new THREE.Color().setHSL(0.02, 1.0, 0.45);                           // red
+  if (t < 0.25) return new THREE.Color().setHSL(0.67, 1.0, 0.3 + t * 0.8);
+  if (t < 0.5)  return new THREE.Color().setHSL(0.45, 1.0, 0.4);
+  if (t < 0.75) return new THREE.Color().setHSL(0.10, 1.0, 0.5);
+  return new THREE.Color().setHSL(0.02, 1.0, 0.45);
 }
 
 export class OceanLayer {
   #mesh  = null;
   #scene = null;
-  #dummy = new THREE.Object3D();
+  #dummy = null;
 
   init(scene) {
-    this.#scene = scene;
-    const geo = new THREE.CircleGeometry(0.07, 6);
-    const mat = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.55, depthWrite: false });
+    const THREE  = window.THREE;
+    this.#scene  = scene;
+    this.#dummy  = new THREE.Object3D();
+
+    const geo  = new THREE.CircleGeometry(0.07, 6);
+    const mat  = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.55, depthWrite: false });
     this.#mesh = new THREE.InstancedMesh(geo, mat, MAX);
     this.#mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.#mesh.renderOrder = 1;
@@ -44,6 +47,7 @@ export class OceanLayer {
 
   #update(grid) {
     if (!this.#mesh || !grid?.length) return;
+    const THREE = window.THREE;
     const count = Math.min(grid.length, MAX);
     const color = new THREE.Color();
 

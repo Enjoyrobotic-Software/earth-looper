@@ -6,7 +6,7 @@
  *   - CDN scripts (Three.js, fonts): Cache-First, long TTL
  */
 
-const CACHE_NAME    = 'earthos-v5-r1';
+const CACHE_NAME    = 'earthos-v5-r2';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -56,10 +56,9 @@ const STATIC_ASSETS = [
   '/sources/openaq.js',
   '/sources/gvp.js',
   '/ui/panel.js',
-  '/ui/layerBar.js',
+  '/ui/layerMenu.js',
   '/ui/search.js',
   '/ui/notifications.js',
-  '/ui/statusBar.js',
   '/ui/timeline.js',
   '/ui/causalChainPanel.js',
   '/ui/exportPanel.js',
