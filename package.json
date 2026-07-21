@@ -6,7 +6,7 @@
   "scripts": {
     "test": "node --experimental-vm-modules node_modules/vitest/vitest.mjs run",
     "test:watch": "node --experimental-vm-modules node_modules/vitest/vitest.mjs",
-    "serve": "python3 -m http.server 8080"
+    "serve": "python3 -m http.server 8181"
   },
   "devDependencies": {
     "vitest": "^1.6.1"

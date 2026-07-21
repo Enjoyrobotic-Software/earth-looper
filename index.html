@@ -183,6 +183,7 @@ import { NOAASource }                   from './sources/noaa.js';
 import { CopernicusSource }             from './sources/copernicus.js';
 import { ACLEDSource }                  from './sources/acled.js';
 import { WorldBankSource }              from './sources/worldbank.js';
+import { GVPSource }                    from './sources/gvp.js';
 
 // ── AI / Simulation ────────────────────────────────────────────────────────
 import causalGraph                      from './ai/causalGraph.js';
@@ -305,8 +306,11 @@ if (SOURCE_CONFIG.acled.enabled)
 if (SOURCE_CONFIG.worldbank.enabled)
   engine.registerSource('worldbank',   new WorldBankSource(SOURCE_CONFIG.worldbank));
 
-// TLE satellites — always on (CelesTrak is public)
-engine.registerSource('tle', new TLESource({ catalogs: ['stations', 'starlink', 'gps_ops'] }));
+if (SOURCE_CONFIG.gvp?.enabled)
+  engine.registerSource('gvp', new GVPSource(SOURCE_CONFIG.gvp));
+
+// TLE satellites — always on
+engine.registerSource('tle', new TLESource());
 
 // ── AI engines initialised by import side-effects ─────────────────────────
 // causalGraph, eventAnalyzer, insights — active listeners from module load

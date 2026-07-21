@@ -55,6 +55,10 @@ export const SOURCE_CONFIG = {
   worldbank: {
     enabled: true,  // Public API, no key required
   },
+
+  gvp: {
+    enabled: true,  // Smithsonian GVP + GitHub fallback, no key required
+  },
 };
 
 export default SOURCE_CONFIG;
