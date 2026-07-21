@@ -22,9 +22,9 @@ canvas { display:block; width:100%; height:100%; touch-action:none; }
 
 /* Top bar */
 #top { position:fixed; top:0; left:0; right:0; z-index:20; display:flex;
-       align-items:center; justify-content:space-between; padding:14px 20px;
+       align-items:center; justify-content:flex-start; padding:14px 20px;
        background:linear-gradient(to bottom,rgba(11,15,20,.9) 0%,transparent 100%);
-       pointer-events:auto; gap:12px; }
+       pointer-events:auto; gap:14px; }
 .brand { font-family:var(--mono); font-size:10px; font-weight:500;
          letter-spacing:.18em; text-transform:uppercase; color:var(--muted); white-space:nowrap; flex-shrink:0; }
 .brand b { color:var(--head); font-weight:500; }
@@ -44,12 +44,12 @@ canvas { display:block; width:100%; height:100%; touch-action:none; }
        display:flex; align-items:center; gap:8px; }
 .sri:hover { background:rgba(255,255,255,.06); }
 
-/* Clock */
-#clkw { text-align:right; flex-shrink:0; }
-#clk  { font-family:var(--mono); font-size:11px; color:var(--muted); letter-spacing:.1em; }
-@media(max-width:480px){ #clkw { display:none; } }
-
-/* Status bar managed by ui/statusBar.js */
+/* Floating clock HUD */
+#eos-clock-hud {
+  position:fixed; top:16px; right:16px; z-index:21;
+  font-family:var(--mono); font-size:11px; color:rgba(255,255,255,0.32);
+  letter-spacing:.1em; pointer-events:none;
+}
 
 /* Boot screen */
 #eos-boot {
@@ -103,9 +103,11 @@ canvas { display:block; width:100%; height:100%; touch-action:none; }
 <!-- Top bar -->
 <div id="top">
   <div class="brand"><b>EARTH</b>OS <span style="opacity:.4">v5</span></div>
-  <div id="eos-layer-bar"></div>
-  <div id="clkw"><div id="clk"></div></div>
+  <button id="eos-layers-btn"></button>
 </div>
+
+<!-- Clock HUD -->
+<div id="eos-clock-hud"></div>
 
 <!-- Search -->
 <div id="swrap">
@@ -144,10 +146,9 @@ import NightLayer                       from './render/layers/nightLayer.js';
 
 // ── UI ─────────────────────────────────────────────────────────────────────
 import { PanelUI }                      from './ui/panel.js';
-import { LayerBarUI }                   from './ui/layerBar.js';
+import { LayerMenuUI }                  from './ui/layerMenu.js';
 import { SearchUI }                     from './ui/search.js';
 import { NotificationSystem }           from './ui/notifications.js';
-import { StatusBar }                    from './ui/statusBar.js';
 import { TimelineUI }                   from './ui/timeline.js';
 import CausalChainPanel                 from './ui/causalChainPanel.js';
 import ExportPanel                      from './ui/exportPanel.js';
@@ -155,7 +156,6 @@ import CountryCompare                   from './ui/countryCompare.js';
 import PerfMonitor                      from './ui/perfMonitor.js';
 import KeyboardShortcuts                from './ui/keyboardShortcuts.js';
 import LiveIndicator                    from './ui/liveIndicator.js';
-import { StatsHUD }                     from './ui/statsHUD.js';
 import windowManager                    from './ui/windowManager.js';
 import Dock                             from './ui/dock.js';
 import contextMenu                      from './ui/contextMenu.js';
@@ -229,25 +229,22 @@ renderer.addPlugin('pol-layer',  new PollutionLayer());
 renderer.addPlugin('night-layer', new NightLayer());
 
 // UI
-const panel    = new PanelUI();
-const layerBar = new LayerBarUI('eos-layer-bar');
-const search   = new SearchUI(COUNTRIES);
-const notifs   = new NotificationSystem();
-const status   = new StatusBar();
-const timeline     = new TimelineUI();
+const panel      = new PanelUI();
+const layerMenu  = new LayerMenuUI();
+const search     = new SearchUI(COUNTRIES);
+const notifs     = new NotificationSystem();
+const timeline   = new TimelineUI();
 const causalPanel   = new CausalChainPanel();
 const exportPanel   = new ExportPanel(canvas);
 const countryComp   = new CountryCompare();
 const perfMonitor   = new PerfMonitor();
 const shortcuts     = new KeyboardShortcuts();
 const liveIndicator = new LiveIndicator();
-const statsHUD      = new StatsHUD();
 
 panel.init();
-layerBar.init();
+layerMenu.init();
 search.init();
 notifs.init();
-status.init();
 timeline.init();
 causalPanel.init();
 exportPanel.init();
@@ -255,7 +252,6 @@ countryComp.init();
 perfMonitor.init();
 shortcuts.init();
 liveIndicator.init();
-statsHUD.init();
 
 // ── Window Manager + Context Menu ─────────────────────────────────────────
 windowManager.init();
@@ -330,7 +326,7 @@ bus.on(Events.COUNTRY_SELECTED, ({ lat, lon, country }) => {
 });
 
 // ── UTC clock ─────────────────────────────────────────────────────────────
-const clk  = document.getElementById('clk');
+const clk  = document.getElementById('eos-clock-hud');
 const tick = () => { clk.textContent = new Date().toUTCString().slice(17,25) + ' UTC'; };
 tick(); setInterval(tick, 1000);
 
