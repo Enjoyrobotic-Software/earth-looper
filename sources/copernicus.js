@@ -61,12 +61,13 @@ export class CopernicusSource extends BaseSource {
 
     const tasks = OCEAN_POINTS.map(({ lat, lon }) =>
       this.fetchJSON(
-        `https://api.open-meteo.com/v1/marine?latitude=${lat}&longitude=${lon}&current=sea_surface_temperature&timezone=UTC`,
+        `https://marine-api.open-meteo.com/v1/marine?latitude=${lat}&longitude=${lon}&hourly=sea_surface_temperature&forecast_days=1&timezone=UTC`,
         { ttl: 3_500_000 }
       )
       .then(d => {
-        const sst = d.current?.sea_surface_temperature;
-        if (sst != null && !isNaN(sst)) grid.push({ lat, lon, sst });
+        const arr = d.hourly?.sea_surface_temperature;
+        const sst = Array.isArray(arr) ? arr.find(v => v != null && !isNaN(v)) : null;
+        if (sst != null) grid.push({ lat, lon, sst });
       })
       .catch(() => {})
     );
